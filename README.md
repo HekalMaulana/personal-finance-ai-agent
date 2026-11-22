@@ -21,6 +21,7 @@ Skill `personal-finance-analysis` tetap untuk analisis tanpa pencatatan. Skill [
 | Teruji end-to-end untuk ledger fiktif | Hermes memuat `finance-transactions`, mencatat dua transaksi, mengulangi satu permintaan tanpa duplikasi, dan membaca ringkasan dari proses CLI baru. Lihat [bukti dan batas uji](docs/evaluation.md#lesson-3-tahap-b--cli-dan-percakapan-hermes). |
 | Tersedia untuk ledger fiktif | Koreksi transaksi dengan riwayat append-only dan perlindungan versi lama. Gunakan `get` dengan `include_version: true`, lalu `correct` atau `history`. |
 | Tersedia, teruji lewat CLI | Ekspor Excel atas permintaan eksplisit dari ledger fiktif; lihat [pengujian Lesson 4](docs/evaluation.md#lesson-4--excel-reporting-on-demand). |
+| Tersedia untuk ledger fiktif | Anggaran bulanan dan realisasi efektif dari SQLite; pembaruan memakai konfirmasi dan audit versi. Lihat [evaluasi Lesson 5A](docs/evaluation.md#lesson-5a--anggaran-bulanan). |
 | Direncanakan, belum aktif | Penggunaan database utama dari percakapan, tinjauan mingguan, evaluasi dana darurat triwulanan, dan pengecekan jadwal terlewat. |
 
 ## Mencoba prototipe
@@ -64,9 +65,24 @@ CLI Windows (tidak perlu JSON stdin):
 py -3.12 -B finance_reporting.py --ledger lesson3-demo export
 ```
 
-Gunakan Python 3.12+ dengan `openpyxl` (`requirements-reporting.txt`). Python Windows 3.12 yang diperiksa sudah memiliki 3.1.5; `python3` bawaan Hermes yang diperiksa belum memilikinya. Siapkan dependensi hanya dengan persetujuan. Workbook `reports/laporan-keuangan.xlsx` adalah keluaran lokal yang diabaikan Git. Sheet Dashboard, Transaksi, dan Bulanan berasal dari versi transaksi efektif; Anggaran, Dana Darurat, dan Target Tabungan berstatus “Belum dikonfigurasi”. Pembaruan mengganti seluruh workbook, termasuk edit manual. Tutup file di Excel jika terkunci.
+Gunakan Python 3.12+ dengan `openpyxl` (`requirements-reporting.txt`). Python Windows 3.12 yang diperiksa sudah memiliki 3.1.5; `python3` bawaan Hermes yang diperiksa belum memilikinya. Siapkan dependensi hanya dengan persetujuan. Workbook `reports/laporan-keuangan.xlsx` adalah keluaran lokal yang diabaikan Git. Sheet Dashboard, Transaksi, dan Bulanan berasal dari versi transaksi efektif; Anggaran menampilkan pagu dan realisasi efektif untuk semua periode yang dikonfigurasi, atau “Belum dikonfigurasi” bila tidak ada pagu. Dana Darurat dan Target Tabungan tetap belum dikonfigurasi. Pembaruan mengganti seluruh workbook, termasuk edit manual. Tutup file di Excel jika terkunci.
 
 Uji lengkap pada Windows: `py -3.12 -B -m unittest discover -s tests -v`.
+
+### Mengelola anggaran bulanan fiktif
+
+Di Hermes: “Tetapkan anggaran Makanan Rp1.000.000 untuk November 2026 pada ledger fiktif lesson3-demo.” Ledger harus sudah ada. Gunakan [skill `finance-budgets`](.hermes/skills/finance-budgets/SKILL.md) untuk membuat, membaca sisa, menyaring kategori di atas 90%, atau meninjau perubahan sebelum mengonfirmasi. Tidak ada ekspor otomatis.
+
+CLI menggunakan `finance_cli.py --ledger NAMA OPERASI` dengan satu objek JSON di stdin:
+
+| Operasi | Field JSON |
+| --- | --- |
+| `budget-create` | `period` (`YYYY-MM`), `category`, `amount_rupiah` (integer positif), `idempotency_key` |
+| `budget-get`, `budget-history` | `period`, `category` |
+| `budget-update` | Field create ditambah `expected_version` dari `budget-get`, `confirmed: true` setelah konfirmasi, dan `reason` |
+| `budget-summary` | `period`; opsional `category` dan `above_warning` (boolean; `true` berarti **lebih dari** 90%) |
+
+Contoh JSON ringkasan: `{"period":"2026-11","category":"Makanan"}`. Nama kategori yang hanya berbeda kapitalisasi atau spasi berulang/tepi dihitung bersama. Sisa bisa negatif; status mendekati batas mulai 90% sampai 100% inklusif, dan melebihi batas setelah 100%. Tidak ada anggaran yang dibuat otomatis untuk kategori tanpa pagu.
 
 ## Dokumentasi pengembangan
 

@@ -168,3 +168,27 @@ Empat sesi dengan `openai/gpt-6.2-sol` pada salinan proyek dan ledger fiktif ter
 | Jelaskan kondisi keuangan fiktif | Analisis saja | Sesi selesai tanpa mengubah SHA-256 workbook maupun SQLite. |
 
 Verifikasi memeriksa struktur dan nilai workbook, bukan rendering visual di aplikasi Excel. Kegagalan mengganti target disimulasikan; kehilangan daya, filesystem jaringan, dan kapasitas maksimum belum diuji.
+
+## Lesson 5A — Anggaran bulanan
+
+Simulasi — seluruh data fiktif. Python 3.12.6, SQLite 3.45.3, openpyxl 3.1.5. `py -3.12 -B -m unittest discover -s tests -v`: 56/56 lulus (42 regresi, 14 uji anggaran baru). `mypy --ignore-missing-imports` lulus untuk empat modul sumber. Database utama tidak dipakai.
+
+| Kasus | Diharapkan | Aktual terverifikasi |
+| --- | --- | --- |
+| Makanan November 2026, pagu Rp1.000.000, expense Rp250.000 dan Rp150.000 | Realisasi Rp400.000; sisa Rp600.000; 40% | Sama, status normal |
+| Koreksi transaksi pertama menjadi Rp25.000 | Realisasi Rp175.000; sisa Rp825.000; 17,5% | Sama, status normal. SQLite baca-saja: baris asli tetap berjumlah Rp400.000; revisi transaksi versi 1 bernilai Rp25.000; jumlah efektif Rp175.000. |
+| Kategori, tipe, bulan dan ambang | Kapital/spasi tidak menggandakan; kategori/tanggal efektif memindahkan realisasi; income tidak dihitung; pagu tak terkonfigurasi tidak direka | Sesuai. `16:59:59.999999Z` dan `17:00:00Z` pada 31 Oktober masuk Oktober dan November; 90% mendekati batas tetapi tidak masuk filter `>90%`; 101% menghasilkan sisa negatif dan status melebihi batas. |
+| Tulis, audit dan legacy | Konfirmasi, versi, retry, rollback dan validasi bekerja; baca tidak memigrasi | Sesuai. SQLite independen memeriksa revisi 0/1/2 dan nominal sebelumnya; retry tidak menambah baris; kegagalan insert membatalkan identitas baru. Byte dan mtime ledger lama tidak berubah pada pembacaan; penulisan menambah dua tabel anggaran. |
+| Excel on-demand | Tidak membuat atau mengganti workbook tanpa ekspor; worksheet dapat dibaca ulang | Workbook belum ada setelah operasi anggaran dan koreksi; bila sudah ada, byte dan mtime tetap setelah create/update/summary. Ekspor eksplisit membuka ulang Anggaran: fallback “Belum dikonfigurasi” atau tujuh kolom berisi bulan, kategori, angka dan status; SQLite tidak berubah. |
+
+Tiga temuan review direproduksi dan ditutup dengan uji regresi: skema non-ledger ditolak tanpa mutasi, label yang melewati 100 karakter setelah NFC menghasilkan `invalid_input`, dan hard link ditolak sebelum API membuka SQLite. Review lanjutan menambahkan regresi untuk tabel koreksi yang tidak kompatibel dan simulasi pengalihan path sesudah konstruksi; kedua kondisi ditolak sebelum mutasi, dan pada simulasi pengalihan tidak ada koneksi SQLite.
+
+### End-to-end percakapan Hermes
+
+Hermes CLI v0.23.3, `openai/gpt-6.2-sol`, tiga giliran di satu sesi pada salinan proyek dan ledger sementara. Pemanggilan awal dengan opsi eksplisit provider/toolset/format gagal `invalid_params`; invokasi biasa dengan `-m` dan `--resume` berhasil tanpa perubahan konfigurasi. Skill tersedia lewat `skill_view` di sesi pengembangan; uji CLI memakai pembacaan file skill sebagai fallback, bukan bukti discovery otomatis.
+
+1. Dua expense disiapkan lewat CLI. Hermes membuat pagu Rp1.000.000, lalu membaca Rp400.000 / Rp600.000 / 40%. Koneksi SQLite independen membuktikan tepat satu revisi pagu versi 0 dan tidak ada workbook.
+2. Harness mengoreksi expense pertama lewat CLI. Hermes membaca Rp175.000 / Rp825.000 / 17,5%, lalu menampilkan pratinjau perubahan pagu ke Rp900.000. SQLite independen pada titik ini masih hanya memiliki versi 0.
+3. Sesudah konfirmasi terpisah, Hermes menjalankan update dan membaca kembali versi 1. SQLite baca-saja menemukan dua versi pagu, audit Rp1.000.000 → Rp900.000 dengan alasan, realisasi efektif Rp175.000, dan tidak ada pelanggaran foreign key. Workbook masih belum ada. Ekspor eksplisit via CLI kemudian menghasilkan baris `2026-11`, Makanan, Rp900.000, Rp175.000, Rp725.000, 19,44% (tampilan), `normal`. Pembaca XLSX independen memeriksa nilainya dan SHA-256 SQLite identik sebelum/sesudah ekspor.
+
+Batas bukti: satu sesi percakapan; ekspor akhir diuji lewat CLI, bukan percakapan atau rendering Excel. Belum ada uji beban atau audit terhadap manipulasi file SQLite langsung.

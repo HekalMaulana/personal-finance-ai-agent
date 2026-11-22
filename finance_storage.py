@@ -68,6 +68,16 @@ WHERE (:start IS NULL OR occurred_at >= :start)
 """
 
 
+def reject_hardlinked_ledger(path: Path) -> None:
+    """Reject aliases without opening or inspecting a protected database."""
+    try:
+        links = path.stat().st_nlink
+    except FileNotFoundError:
+        return  # Callers decide whether the ledger may be created.
+    if links > 1:
+        raise ValueError("Ledger tidak boleh memiliki tautan keras.")
+
+
 class IdempotencyConflict(ValueError):
     """The same idempotency key already has a different payload."""
 

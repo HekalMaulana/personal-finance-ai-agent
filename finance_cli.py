@@ -9,7 +9,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Never
 
-from finance_storage import IdempotencyConflict, StaleVersion, TransactionNotFound, TransactionStore
+from finance_budgets import BudgetExists, BudgetNotFound, BudgetStore
+from finance_storage import (
+    IdempotencyConflict, StaleVersion, TransactionNotFound, TransactionStore, reject_hardlinked_ledger,
+)
 
 _ROOT = Path(__file__).resolve().parent
 _LEDGER_DIR = _ROOT / "data" / "finance-cli"
@@ -18,7 +21,17 @@ _LEDGER = re.compile(r"[a-z][a-z0-9-]{0,47}")
 # The 1,228 allowed characters across free-text fields fit within 16 KiB.
 _MAX_REQUEST = 16 * 1024
 _DATES = {"start_date", "end_date"}
+_BUDGET_KEY = {"period", "category"}
+_BUDGET_WRITE = _BUDGET_KEY | {"amount_rupiah", "idempotency_key"}
+_BUDGET_FIELDS = {
+    "budget-create": (_BUDGET_WRITE, set()),
+    "budget-update": (_BUDGET_WRITE | {"expected_version", "confirmed", "reason"}, set()),
+    "budget-get": (_BUDGET_KEY, set()),
+    "budget-history": (_BUDGET_KEY, set()),
+    "budget-summary": ({"period"}, {"category", "above_warning"}),
+}
 _FIELDS = {
+    **_BUDGET_FIELDS,
     "add": ({"transaction_type", "amount_rupiah", "category", "occurred_at", "idempotency_key"}, {"description"}),
     "prepare-add": ({"transaction_type", "amount_rupiah", "category", "occurred_at", "idempotency_key"}, {"description"}),
     "commit-add": ({"operation_id"}, set()),
@@ -65,16 +78,6 @@ def _request(operation: str) -> dict[str, Any]:
     return payload
 
 
-def reject_hardlinked_ledger(path: Path) -> None:
-    """Reject aliases without opening or inspecting the protected database."""
-    try:
-        links = path.stat().st_nlink
-    except FileNotFoundError:
-        return  # Callers decide whether a missing ledger may be created.
-    if links > 1:
-        raise ValueError("Ledger tidak boleh memiliki tautan keras.")
-
-
 def ledger_path(name: str) -> Path:
     if not _LEDGER.fullmatch(name):
         raise ValueError("Nama ledger: 1–48 karakter ASCII huruf kecil, angka, atau tanda hubung; awali dengan huruf.")
@@ -97,6 +100,22 @@ def _emit(status: int, *, operation: str | None = None, data: Any = None,
     return status
 
 
+def _budget_request(path: Path, operation: str, payload: dict[str, Any]) -> Any:
+    store = BudgetStore(path)
+    if operation == "budget-create":
+        return asdict(store.create_budget(**payload))
+    if operation == "budget-update":
+        return asdict(store.update_budget(**payload))
+    if operation == "budget-get":
+        result = store.get_budget(**payload)
+        if result is None:
+            raise BudgetNotFound("Anggaran belum dikonfigurasi.")
+        return asdict(result)
+    if operation == "budget-history":
+        return [asdict(row) for row in store.budget_history(**payload)]
+    return [asdict(row) for row in store.budget_summary(**payload)]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _Parser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--ledger", required=True, help="nama ledger fiktif di data/finance-cli/")
@@ -111,6 +130,8 @@ def main(argv: list[str] | None = None) -> int:
         writing = creates or args.operation in ("correct", "commit-add")
         if not creates and not path.exists():
             return _emit(4, code="database_not_found", message="Ledger belum ada.")
+        if args.operation in _BUDGET_FIELDS:
+            return _emit(0, operation=args.operation, data=_budget_request(path, args.operation, payload))
         store = TransactionStore(path, read_only=not writing, defer_init=writing)
         if args.operation == "add":
             data: Any = asdict(store.add_transaction(**payload))
@@ -148,6 +169,10 @@ def main(argv: list[str] | None = None) -> int:
         return _emit(3, code="idempotency_conflict", message=str(exc))
     except StaleVersion as exc:
         return _emit(6, code="stale_version", message=str(exc))
+    except BudgetExists as exc:
+        return _emit(8, code="budget_exists", message=str(exc))
+    except BudgetNotFound as exc:
+        return _emit(4, code="budget_not_found", message=str(exc))
     except TransactionNotFound as exc:
         return _emit(4, code="transaction_not_found", message=str(exc))
     except ValueError as exc:

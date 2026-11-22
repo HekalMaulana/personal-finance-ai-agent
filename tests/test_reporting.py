@@ -130,7 +130,7 @@ class ReportingIntegrationTests(unittest.TestCase):
         with patch("finance_cli._LEDGER_DIR", self.root.resolve()):
             with self.assertRaisesRegex(ValueError, "tautan"):
                 ledger_path("alias")
-        with patch("finance_reporting.TransactionStore") as store:
+        with patch("finance_reporting.BudgetStore") as store:
             with self.assertRaisesRegex(ValueError, "tautan"):
                 reporting.export_report(alias, self.out, ledger="alias")
             store.assert_not_called()
@@ -164,7 +164,7 @@ class ReportingIntegrationTests(unittest.TestCase):
     def test_cli_only_exports_on_explicit_operation(self):
         from shutil import copyfile
 
-        for name in ("finance_cli.py", "finance_storage.py", "finance_reporting.py"):
+        for name in ("finance_cli.py", "finance_storage.py", "finance_budgets.py", "finance_reporting.py"):
             copyfile(ROOT / name, self.root / name)
 
         def cli(script, operation, payload=None, ledger="lesson4-fixture"):

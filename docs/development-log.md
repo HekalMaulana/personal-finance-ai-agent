@@ -50,3 +50,9 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 - Memisahkan CLI ekspor dari CLI transaksi dan menambahkan `finance-reporting` untuk permintaan eksplisit. Engine memakai versi efektif dari satu snapshot baca-saja; tiga sheet perencanaan tetap belum dikonfigurasi.
 - Menggunakan `openpyxl` 3.1.5 yang sudah ada pada Python Windows 3.12. Tidak ada instalasi atau perubahan konfigurasi Hermes. Penulisan menggunakan file sementara yang diverifikasi sebelum penggantian.
 - Pengujian fixture mencakup pembukaan ulang XLSX, agregasi SQL independen, pergantian bulan lokal, koreksi, formula injection, ekspor ulang, serta kegagalan penggantian. Lihat [hasil dan batas verifikasi](evaluation.md#lesson-4--excel-reporting-on-demand).
+
+## Lesson 5A — Budget Management
+
+- Menambahkan anggaran bulanan berversi pada ledger fiktif yang sudah ada. Identitas periode/kategori unik; tidak ada upsert diam-diam atau hapus. Pembaruan memerlukan konfirmasi dan versi, dengan audit append-only dan retry idempoten.
+- Realisasi diturunkan setiap kali dibaca dari expense efektif per bulan Pontianak; Excel mendapat pagu dan transaksi dari snapshot yang sama, tetap hanya melalui ekspor eksplisit.
+- Suite 56/56 lulus. Uji Hermes tiga giliran dan verifikasi SQLite independen membuktikan realisasi Rp400.000 → Rp175.000, tidak ada revisi pagu sebelum konfirmasi, dan satu revisi setelahnya. Uji CLI membuka ulang worksheet Anggaran dengan nilai yang benar. Lihat [evaluasi dan batas bukti](evaluation.md#lesson-5a--anggaran-bulanan).
