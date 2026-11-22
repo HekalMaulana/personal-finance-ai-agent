@@ -110,3 +110,21 @@ Pengecekan tipe `mypy` juga lulus. Evaluasi engine ini bukan audit keamanan meny
 Ledger E2E: `data/finance-cli/e2e-tahap-b-01.db` (diabaikan Git). `summary` mengembalikan `ok:true`, `total_income:5000000`, `total_expense:25000`, `net_cash_flow:4975000`, `transaction_count:2`, seluruhnya sesuai ekspektasi. Baris Gaji muncul pada 08:00 dan Makanan pada 12:00, 1 November 2026 UTC+07:00. Tidak ada seed CLI manual sebelum sesi ini. Verifikasi setelah sesi hanya membaca.
 
 Gateway menolak opsi `--run-budget` dan preload `--skills` menghasilkan `unknown_skill`; penemuan **dari dalam sesi** berhasil. Kebijakan satu kueri menolak heredoc dan Python `-c`; sesi memakai PTY Windows dengan JSON di stdin dan menunggu exit code proses. Tidak ada pengaturan global yang diubah. Skenario utama memakai tanggal, kategori, dan key eksplisit. Dalam sesi baru terpisah, permintaan mencatat pengeluaran makan siang tanpa waktu membuat Hermes meminta tanggal dan jam, menyatakan belum menyimpan, dan tidak memanggil CLI. Ini belum membuktikan konsistensi lintas profil, klarifikasi seluruh kasus ambigu, atau pemulihan key setelah konteks hilang. Bukan audit keamanan menyeluruh.
+
+## Lesson 3 Tahap C — Koreksi dan audit trail
+
+**Simulasi — data fiktif.** `python3 -B -m unittest discover -s tests -v`: 29/29 lulus (18 storage, 11 CLI), termasuk 19 uji lama. Pemeriksaan tipe `mypy` lulus. Ledger utama tidak digunakan.
+
+| Lapisan / kasus | Diharapkan | Aktual |
+| --- | --- | --- |
+| Storage: nominal, histori dan persistensi | Rp250.000 sebelum koreksi, Rp25.000 sesudah; satu transaksi efektif dan riwayat asli tetap ada | `cash_flow` sesuai; koneksi baru membaca versi 1, asli Rp250.000, sebelum Rp250.000, sesudah Rp25.000 |
+| Storage: tipe, tanggal, kategori dan deskripsi | Filter dan total hanya memakai nilai terakhir; deskripsi dapat menjadi null | Beralih dari expense ke income dan ke hari lokal berikutnya; kategori berubah dan deskripsi kosong |
+| Storage: persaingan dan rollback | Dua koreksi versi awal dengan key berbeda menghasilkan satu revisi; kegagalan setelah insert tidak meninggalkan revisi | Satu sukses, satu `StaleVersion`; trigger uji `AFTER INSERT` dengan `RAISE(FAIL)` memicu rollback; total tetap Rp250.000 dan histori kosong sampai retry yang sah |
+| Storage: migrasi dan retry | Ledger lama bisa dibaca tanpa perubahan; koreksi pertama menambah tabel saja; retry identik mengembalikan hasil asli | Byte file lama tidak berubah setelah baca, nilai asli tetap Rp250.000 setelah migrasi; retry koreksi tetap idempoten setelah revisi lanjutan dan retry `add` tetap kompatibel |
+| CLI: proses terpisah | `get` menampilkan versi opsional, `correct` dan retry sukses, `history` bertahan setelah proses berakhir; input tidak valid/key konflik/versi lama ditolak | Versi 0 → 1, total Rp250.000 → Rp25.000; histori satu revisi, kode 2/3/6 sesuai; ID/ledger tidak ditemukan menghasilkan 4 tanpa membuat ledger |
+| CLI: JSON ASCII untuk Unicode | Alasan, deskripsi, kategori, dan key pada panjang maksimum dapat dikirim sebagai JSON ASCII ringkas | Tes regresi gagal pada batas lama 8 KiB, lalu lulus pada batas 16 KiB; `history` membaca ulang teks yang sama. Diuji lewat stdin proses CLI, bukan lewat PTY dengan payload maksimum |
+| Percakapan Hermes | Pratinjau tanpa menulis; koreksi hanya setelah konfirmasi; retry identik; summary/history dari proses baru | Pada giliran pertama `get` menampilkan versi 0 dan histori masih kosong. Setelah konfirmasi, `correct` dan retry mengembalikan exit 0 dengan ID operasi yang sama. Proses `summary` dan `history` baru menunjukkan Rp25.000, satu transaksi efektif, dan satu revisi |
+
+Ledger E2E: `data/finance-cli/e2e-tahap-c-01.db` (diabaikan Git). Transaksi awal disiapkan lewat CLI untuk menguji alur koreksi pada percakapan; penulisan revisi dijalankan Hermes. Koneksi SQLite baca-saja yang independen menemukan satu baris asli Rp250.000 dan satu baris audit versi 1 Rp25.000 dengan alasan “Salah input”, waktu UTC+07:00, dan foreign key valid. Summary independen menghasilkan pemasukan Rp0, pengeluaran Rp25.000, arus kas −Rp25.000, satu transaksi.
+
+Batas uji: konfirmasi dengan ID dan key eksplisit pada satu sesi gateway; pemulihan key lintas sesi, autentikasi aktor, manipulasi file langsung, beban tinggi, dan pemulihan crash belum diverifikasi.

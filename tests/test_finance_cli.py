@@ -81,7 +81,7 @@ class CliTests(unittest.TestCase):
             ("list", {"sql": "SELECT 1"}, None), ("remove", {}, None),
             ("list", None, b"[]"), ("list", None, b"not json"),
             ("list", None, b'{"start_date":null,"start_date":"2026-11-01"}'),
-            ("summary", None, b"\xff"), ("summary", None, b" " * 8193),
+            ("summary", None, b"\xff"), ("summary", None, b" " * (16 * 1024 + 1)),
         ):
             with self.subTest(operation=operation, payload=payload, raw=bool(raw)):
                 status, result = self.invoke(operation, payload, raw=raw)
@@ -106,6 +106,56 @@ class CliTests(unittest.TestCase):
                              or isinstance(node, ast.Attribute) and node.attr in {"system", "popen", "execute", "executescript"}
                              or isinstance(node, ast.alias) and node.name.split(".")[0] in {"subprocess", "ctypes", "importlib"}
                              for node in ast.walk(tree)))
+
+    def test_correction_summary_and_history_across_processes(self) -> None:
+        original = self.added({**EXPENSE, "amount_rupiah": 250_000})
+        self.assertEqual(self.invoke("summary")[1]["data"]["total_expense"], 250_000)
+        target = {"id": original["id"]}
+        self.assertEqual(self.invoke("get", {**target, "include_version": True})[1]["data"]["version"], 0)
+        payload = {**target, "expected_version": 0, "changes": {"amount_rupiah": 25_000},
+                   "reason": "Salah input", "idempotency_key": "fixture-correction"}
+        status, result = self.invoke("correct", payload)
+        self.assertEqual(status, 0, result)
+        revision = result["data"]
+        self.assertEqual(revision["before"], original)
+        self.assertEqual(revision["after"]["amount_rupiah"], 25_000)
+        self.assertEqual(self.invoke("correct", payload), (0, result))
+        for change, error, expected_exit in (
+            ({"reason": "Alasan berbeda"}, "idempotency_conflict", 3),
+            ({"idempotency_key": "another-key"}, "stale_version", 6),
+            ({"changes": {"description": 5}}, "invalid_input", 2),
+            ({"id": str(uuid4()), "idempotency_key": "missing-target"}, "transaction_not_found", 4),
+        ):
+            code, reply = self.invoke("correct", {**payload, **change})
+            self.assertEqual((code, reply["error"]["code"]), (expected_exit, error))
+        self.assertEqual(self.invoke("history", target)[1]["data"], {"original": original, "corrections": [revision]})
+        self.assertEqual(self.invoke("get", {**target, "include_version": True})[1]["data"],
+                         {**revision["after"], "version": 1})
+        self.assertEqual(self.invoke("list")[1]["data"], [revision["after"]])
+        self.assertEqual(self.invoke("summary")[1]["data"], dict(total_income=0, total_expense=25_000,
+                                                               net_cash_flow=-25_000, transaction_count=1))
+
+    def test_correction_accepts_max_length_text_encoded_as_ascii_json(self) -> None:
+        original = self.added(EXPENSE)
+        text = "\U0001f600" * 500
+        payload = {"id": original["id"], "expected_version": 0,
+                   "changes": {"description": text, "category": text[:100]},
+                   "reason": text, "idempotency_key": text[:128]}
+        encoded = json.dumps(payload, ensure_ascii=True).encode("ascii")
+        self.assertGreater(len(encoded), 8192)
+        status, result = self.invoke("correct", raw=encoded)
+        self.assertEqual(status, 0, result)
+        audit = self.invoke("history", {"id": original["id"]})[1]["data"]["corrections"]
+        self.assertEqual(audit, [result["data"]])
+        self.assertEqual(audit[0]["reason"], text)
+        self.assertEqual(audit[0]["after"]["description"], text)
+
+    def test_correction_does_not_create_missing_ledger(self) -> None:
+        status, result = self.invoke("correct", {"id": str(uuid4()), "expected_version": 0,
+                                                  "changes": {"amount_rupiah": 25_000}, "reason": "Simulasi",
+                                                  "idempotency_key": "missing-ledger"})
+        self.assertEqual((status, result["error"]["code"]), (4, "database_not_found"))
+        self.assertFalse(self.db.exists())
 
     def test_invalid_database_has_structured_error(self) -> None:
         self.db.parent.mkdir(parents=True, exist_ok=True)

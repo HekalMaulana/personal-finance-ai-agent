@@ -19,7 +19,8 @@ Skill `personal-finance-analysis` tetap untuk analisis tanpa pencatatan. Skill [
 | Tersedia, teruji mandiri | Penyimpanan SQLite lokal untuk data fiktif: tambah, baca, filter, total arus kas, dan retry idempoten. |
 | Dalam pengembangan | Evaluasi konsistensi percakapan lintas sesi dan kasus tepi. Belum ada pengujian keamanan menyeluruh. |
 | Teruji end-to-end untuk ledger fiktif | Hermes memuat `finance-transactions`, mencatat dua transaksi, mengulangi satu permintaan tanpa duplikasi, dan membaca ringkasan dari proses CLI baru. Lihat [bukti dan batas uji](docs/evaluation.md#lesson-3-tahap-b--cli-dan-percakapan-hermes). |
-| Direncanakan, belum aktif | Koreksi dengan audit trail, penggunaan database utama dari percakapan, laporan Excel atas permintaan eksplisit, tinjauan mingguan, evaluasi dana darurat triwulanan, dan pengecekan jadwal terlewat. |
+| Tersedia untuk ledger fiktif | Koreksi transaksi dengan riwayat append-only dan perlindungan versi lama. Gunakan `get` dengan `include_version: true`, lalu `correct` atau `history`. |
+| Direncanakan, belum aktif | Penggunaan database utama dari percakapan, laporan Excel atas permintaan eksplisit, tinjauan mingguan, evaluasi dana darurat triwulanan, dan pengecekan jadwal terlewat. |
 
 ## Mencoba prototipe
 
@@ -43,6 +44,10 @@ printf '%s\n' '{}' | python3 -B finance_cli.py --ledger lesson3-demo summary
 ```
 
 Untuk `get`, kirim `{"id":"<UUID hasil add>"}`; untuk `list`, kirim `{}` atau filter `start_date`, `end_date`, dan `transaction_type`. Dalam percakapan Hermes, pastikan `finance-transactions` ditemukan melalui `skills_list()` dan dimuat melalui `skill_view()`, lalu sebutkan ledger dan data fiktif yang memang diminta untuk disimpan. Tidak perlu mengubah konfigurasi global jika preload `--skills` ditolak.
+
+### Mengoreksi transaksi fiktif
+
+Di ledger yang sama, gunakan `get` dengan `{"id":"<UUID>","include_version":true}`. Setelah meninjau versi dan nilai sebelum/sesudah, kirim JSON ke `correct`, misalnya `{"id":"<UUID>","expected_version":0,"changes":{"amount_rupiah":25000},"reason":"Salah input","idempotency_key":"demo-correct-01"}`. Gunakan versi dan UUID dari hasil baca, bukan nilai contoh. `history` menerima `{"id":"<UUID>"}`. Di Hermes, skill menampilkan pratinjau dan menunggu konfirmasi sebelum menulis. Lihat [hasil uji Tahap C](docs/evaluation.md#lesson-3-tahap-c--koreksi-dan-audit-trail).
 
 ## Dokumentasi pengembangan
 

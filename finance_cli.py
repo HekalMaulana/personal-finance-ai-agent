@@ -9,16 +9,20 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Never
 
-from finance_storage import IdempotencyConflict, TransactionStore
+from finance_storage import IdempotencyConflict, StaleVersion, TransactionNotFound, TransactionStore
 
 _ROOT = Path(__file__).resolve().parent
 _LEDGER_DIR = _ROOT / "data" / "finance-cli"
 _LEDGER = re.compile(r"[a-z][a-z0-9-]{0,47}")
-_MAX_REQUEST = 8192
+# A compact ASCII JSON correction can use 12 bytes per Unicode character.
+# The 1,228 allowed characters across free-text fields fit within 16 KiB.
+_MAX_REQUEST = 16 * 1024
 _DATES = {"start_date", "end_date"}
 _FIELDS = {
     "add": ({"transaction_type", "amount_rupiah", "category", "occurred_at", "idempotency_key"}, {"description"}),
-    "get": ({"id"}, set()),
+    "get": ({"id"}, {"include_version"}),
+    "correct": ({"id", "expected_version", "changes", "reason", "idempotency_key"}, set()),
+    "history": ({"id"}, set()),
     "list": (set(), _DATES | {"transaction_type"}),
     "summary": (set(), _DATES),
 }
@@ -26,7 +30,7 @@ _FIELDS = {
 
 class _Parser(argparse.ArgumentParser):
     def error(self, message: str) -> Never:
-        raise ValueError("Gunakan --ledger NAMA dan operasi add, get, list, atau summary.")
+        raise ValueError("Gunakan --ledger NAMA dan operasi add, get, list, summary, correct, atau history.")
 
 
 def _unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -45,7 +49,7 @@ def _invalid_constant(value: str) -> None:
 def _request(operation: str) -> dict[str, Any]:
     raw = sys.stdin.buffer.read(_MAX_REQUEST + 1)
     if len(raw) > _MAX_REQUEST:
-        raise ValueError("Payload JSON melebihi 8192 byte.")
+        raise ValueError(f"Payload JSON melebihi {_MAX_REQUEST} byte.")
     try:
         payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_pairs,
                              parse_constant=_invalid_constant)
@@ -86,23 +90,39 @@ def main(argv: list[str] | None = None) -> int:
         args = parser.parse_args(argv)
         payload = _request(args.operation)
         path = _db_path(args.ledger)
-        writing = args.operation == "add"
-        if not writing and not path.exists():
-            return _emit(4, code="database_not_found", message="Ledger belum ada; pembacaan tidak membuat database.")
+        writing = args.operation in ("add", "correct")
+        if args.operation != "add" and not path.exists():
+            return _emit(4, code="database_not_found", message="Ledger belum ada; hanya add dapat membuat ledger.")
         store = TransactionStore(path, read_only=not writing, defer_init=writing)
-        if writing:
+        if args.operation == "add":
             data: Any = asdict(store.add_transaction(**payload))
+        elif args.operation == "correct":
+            target = payload.pop("id")
+            data = asdict(store.correct_transaction(target, **payload))
+        elif args.operation == "history":
+            original, revisions = store.transaction_history(payload["id"])
+            data = {"original": asdict(original), "corrections": [asdict(r) for r in revisions]}
         elif args.operation == "get":
-            row = store.get_transaction(payload["id"])
-            if row is None:
-                return _emit(4, code="transaction_not_found", message="Transaction ID tidak ditemukan.")
+            include_version = payload.get("include_version", False)
+            if type(include_version) is not bool:
+                raise ValueError("include_version harus boolean.")
+            found = store.get_versioned_transaction(payload["id"])
+            if found is None:
+                raise TransactionNotFound("Transaction ID tidak ditemukan.")
+            row, version = found
             data = asdict(row)
+            if include_version:
+                data["version"] = version
         elif args.operation == "list":
             data = [asdict(row) for row in store.list_transactions(**payload)]
         else:
             data = asdict(store.cash_flow(**payload))
     except IdempotencyConflict as exc:
         return _emit(3, code="idempotency_conflict", message=str(exc))
+    except StaleVersion as exc:
+        return _emit(6, code="stale_version", message=str(exc))
+    except TransactionNotFound as exc:
+        return _emit(4, code="transaction_not_found", message=str(exc))
     except ValueError as exc:
         return _emit(2, code="invalid_input", message=str(exc))
     except (sqlite3.Error, OSError, RuntimeError):

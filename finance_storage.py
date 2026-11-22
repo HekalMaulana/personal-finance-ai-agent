@@ -1,12 +1,13 @@
 """Local SQLite ledger for fictional transactions; no Hermes integration."""
 
+import json
 import re
 import sqlite3
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Callable, Iterator
 from unicodedata import category as character_category
 from uuid import UUID, uuid4
 
@@ -31,6 +32,36 @@ CREATE TABLE IF NOT EXISTS transactions (
     idempotency_key TEXT NOT NULL UNIQUE CHECK (length(idempotency_key) BETWEEN 1 AND 128)
 )
 """
+_CORRECTIONS = """
+CREATE TABLE IF NOT EXISTS transaction_corrections (
+    operation_id TEXT PRIMARY KEY NOT NULL,
+    transaction_id TEXT NOT NULL REFERENCES transactions(id),
+    version INTEGER NOT NULL CHECK (version > 0),
+    idempotency_key TEXT NOT NULL UNIQUE,
+    request_json TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    corrected_at TEXT NOT NULL,
+    transaction_type TEXT NOT NULL CHECK (transaction_type IN ('income', 'expense')),
+    amount_rupiah INTEGER NOT NULL CHECK (typeof(amount_rupiah) = 'integer' AND amount_rupiah > 0),
+    category TEXT NOT NULL,
+    description TEXT,
+    occurred_at TEXT NOT NULL,
+    UNIQUE (transaction_id, version)
+)
+"""
+_EFFECTIVE = """
+SELECT t.id,
+       coalesce(c.transaction_type, t.transaction_type) AS transaction_type,
+       coalesce(c.amount_rupiah, t.amount_rupiah) AS amount_rupiah,
+       coalesce(c.category, t.category) AS category,
+       CASE WHEN c.version IS NULL THEN t.description ELSE c.description END AS description,
+       coalesce(c.occurred_at, t.occurred_at) AS occurred_at,
+       t.recorded_at, t.idempotency_key, coalesce(c.version, 0) AS version
+FROM transactions AS t
+LEFT JOIN transaction_corrections AS c ON c.transaction_id = t.id
+    AND c.version = (SELECT max(r.version) FROM transaction_corrections AS r WHERE r.transaction_id = t.id)
+"""
+_LEGACY = "SELECT transactions.*, 0 AS version FROM transactions"
 _FILTER = """
 WHERE (:start IS NULL OR occurred_at >= :start)
   AND (:end IS NULL OR occurred_at <= :end)
@@ -51,6 +82,26 @@ class Transaction:
     occurred_at: str
     recorded_at: str
     idempotency_key: str
+
+
+class StaleVersion(ValueError):
+    """The effective version changed after the caller read it."""
+
+
+class TransactionNotFound(LookupError):
+    """The requested transaction ID does not exist."""
+
+
+@dataclass(frozen=True)
+class Correction:
+    operation_id: str
+    transaction_id: str
+    version: int
+    reason: str
+    corrected_at: str
+    idempotency_key: str
+    before: Transaction
+    after: Transaction
 
 
 @dataclass(frozen=True)
@@ -111,6 +162,57 @@ def _bounds(start_date: str | None, end_date: str | None) -> dict[str, str | Non
     }
 
 
+def _amount(value: int) -> int:
+    if type(value) is not int or not 1 <= value <= MAX_AMOUNT:
+        raise ValueError("Nominal harus integer Rupiah positif (maksimum 2^63 − 1).")
+    return value
+
+
+def _description(value: str | None) -> str | None:
+    return None if value is None else _text(value, "Deskripsi", 500)
+
+
+def _transaction_id(value: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError("Transaction ID harus berupa UUID.")
+    try:
+        canonical = str(UUID(value))
+    except ValueError as exc:
+        raise ValueError("Transaction ID harus berupa UUID.") from exc
+    if value != canonical:
+        raise ValueError("Transaction ID harus berupa UUID kanonik huruf kecil.")
+    return value
+
+
+_CHANGE_VALIDATORS: dict[str, Callable[[Any], Any]] = {
+    "transaction_type": _type,
+    "amount_rupiah": _amount,
+    "category": lambda value: _text(value, "Kategori", 100),
+    "description": _description,
+    "occurred_at": _transaction_time,
+}
+
+
+def _has_corrections(conn: sqlite3.Connection) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'transaction_corrections'"
+    ).fetchone() is not None
+
+
+def _effective_sql(conn: sqlite3.Connection) -> str:
+    return _EFFECTIVE if _has_corrections(conn) else _LEGACY
+
+
+def _snapshot(original: Transaction, row: sqlite3.Row) -> Transaction:
+    return replace(original, transaction_type=row["transaction_type"], amount_rupiah=row["amount_rupiah"],
+                   category=row["category"], description=row["description"], occurred_at=row["occurred_at"])
+
+
+def _correction(original: Transaction, before: Transaction, row: sqlite3.Row) -> Correction:
+    return Correction(row["operation_id"], original.id, row["version"], row["reason"],
+                      row["corrected_at"], row["idempotency_key"], before, _snapshot(original, row))
+
+
 class TransactionStore:
     """Initialize a local ledger; use only a trusted application or test path."""
 
@@ -128,15 +230,19 @@ class TransactionStore:
     @staticmethod
     def _initialize(conn: sqlite3.Connection) -> None:
         conn.execute(_SCHEMA)
+        conn.execute(_CORRECTIONS)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_time ON transactions (occurred_at, id)")
 
     @contextmanager
-    def _connection(self) -> Iterator[sqlite3.Connection]:
-        # Explicit BEGIN/COMMIT for writes; reads use SQLite autocommit.
-        target = self._path.as_uri() + "?mode=ro" if self._read_only else str(self._path)
-        conn = sqlite3.connect(target, uri=self._read_only, timeout=5, autocommit=True)
+    def _connection(self, *, snapshot: bool = False, existing: bool = False) -> Iterator[sqlite3.Connection]:
+        mode = "ro" if self._read_only else "rw" if existing else None
+        target = self._path.as_uri() + "?mode=" + mode if mode else str(self._path)
+        conn = sqlite3.connect(target, uri=mode is not None, timeout=5, autocommit=True)
         try:
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            if snapshot:
+                conn.execute("BEGIN")
             yield conn
             if conn.in_transaction:
                 conn.execute("COMMIT")
@@ -150,10 +256,9 @@ class TransactionStore:
     ) -> Transaction:
         """Save once. A retry returns the original ID and recording timestamp."""
         kind = _type(transaction_type)
-        if type(amount_rupiah) is not int or not 1 <= amount_rupiah <= MAX_AMOUNT:
-            raise ValueError("Nominal harus integer Rupiah positif (maksimum 2^63 − 1).")
+        amount_rupiah = _amount(amount_rupiah)
         category = _text(category, "Kategori", 100)
-        description = _text(description, "Deskripsi", 500) if description is not None else None
+        description = _description(description)
         timestamp = _transaction_time(occurred_at)
         key = _text(idempotency_key, "Idempotency key", 128, strip=False)
         payload = (kind, amount_rupiah, category, description, timestamp)
@@ -184,17 +289,90 @@ class TransactionStore:
             return entry
 
     def get_transaction(self, transaction_id: str) -> Transaction | None:
-        if not isinstance(transaction_id, str):
-            raise ValueError("Transaction ID harus berupa UUID.")
-        try:
-            canonical_id = str(UUID(transaction_id))
-        except ValueError as exc:
-            raise ValueError("Transaction ID harus berupa UUID.") from exc
-        if transaction_id != canonical_id:
-            raise ValueError("Transaction ID harus berupa UUID kanonik huruf kecil.")
-        with self._connection() as conn:
-            row = conn.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,)).fetchone()
-            return Transaction(**dict(row)) if row is not None else None
+        result = self.get_versioned_transaction(transaction_id)
+        return result[0] if result is not None else None
+
+    def get_versioned_transaction(self, transaction_id: str) -> tuple[Transaction, int] | None:
+        transaction_id = _transaction_id(transaction_id)
+        with self._connection(snapshot=True) as conn:
+            row = conn.execute("SELECT * FROM (" + _effective_sql(conn) + ") WHERE id = ?",
+                               (transaction_id,)).fetchone()
+            if row is None:
+                return None
+            values = dict(row)
+            version = values.pop("version")
+            return Transaction(**values), version
+
+    def transaction_history(self, transaction_id: str) -> tuple[Transaction, list[Correction]]:
+        transaction_id = _transaction_id(transaction_id)
+        with self._connection(snapshot=True) as conn:
+            original = self._original(conn, transaction_id)
+            revisions = []
+            previous = original
+            if _has_corrections(conn):
+                rows = conn.execute("SELECT * FROM transaction_corrections WHERE transaction_id = ? ORDER BY version",
+                                    (transaction_id,))
+                for row in rows:
+                    revision = _correction(original, previous, row)
+                    revisions.append(revision)
+                    previous = revision.after
+            return original, revisions
+
+    @staticmethod
+    def _original(conn: sqlite3.Connection, transaction_id: str) -> Transaction:
+        row = conn.execute("SELECT * FROM transactions WHERE id = ?", (transaction_id,)).fetchone()
+        if row is None:
+            raise TransactionNotFound("Transaction ID tidak ditemukan.")
+        return Transaction(**dict(row))
+
+    def correct_transaction(self, transaction_id: str, *, expected_version: int,
+                            changes: dict, reason: str, idempotency_key: str) -> Correction:
+        """Append one complete effective snapshot without modifying the original."""
+        transaction_id = _transaction_id(transaction_id)
+        if type(expected_version) is not int or not 0 <= expected_version < MAX_AMOUNT:
+            raise ValueError("expected_version harus integer nonnegatif dalam rentang yang didukung.")
+        if not isinstance(changes, dict) or not changes or not changes.keys() <= _CHANGE_VALIDATORS.keys():
+            raise ValueError("changes harus objek tidak kosong berisi field transaksi yang dapat dikoreksi.")
+        normalized = {field: _CHANGE_VALIDATORS[field](value) for field, value in changes.items()}
+        reason = _text(reason, "Alasan koreksi", 500)
+        key = _text(idempotency_key, "Idempotency key", 128, strip=False)
+        request = json.dumps([transaction_id, expected_version, normalized, reason], sort_keys=True)
+        with self._connection(existing=True) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(_CORRECTIONS)
+            prior = conn.execute("SELECT * FROM transaction_corrections WHERE idempotency_key = ?", (key,)).fetchone()
+            if prior is not None and prior["request_json"] != request:
+                raise IdempotencyConflict("Konflik idempotency key: payload koreksi berbeda.")
+            original = self._original(conn, transaction_id)
+            if prior is not None:
+                predecessor = conn.execute(
+                    "SELECT * FROM transaction_corrections WHERE transaction_id = ? AND version = ?",
+                    (transaction_id, expected_version),
+                ).fetchone()
+                before = original if predecessor is None else _snapshot(original, predecessor)
+                return _correction(original, before, prior)
+            latest = conn.execute(
+                "SELECT * FROM transaction_corrections WHERE transaction_id = ? ORDER BY version DESC LIMIT 1",
+                (transaction_id,),
+            ).fetchone()
+            version = 0 if latest is None else latest["version"]
+            if expected_version != version:
+                raise StaleVersion("Versi transaksi telah berubah; baca ulang sebelum mengoreksi.")
+            before = original if latest is None else _snapshot(original, latest)
+            after = replace(before, **normalized)
+            if before == after:
+                raise ValueError("Koreksi tidak mengubah nilai efektif transaksi.")
+            operation_id = str(uuid4())
+            timestamp = _local_iso(datetime.now(PONTIANAK))
+            conn.execute(
+                """INSERT INTO transaction_corrections
+                   (operation_id, transaction_id, version, idempotency_key, request_json, reason,
+                    corrected_at, transaction_type, amount_rupiah, category, description, occurred_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (operation_id, transaction_id, version + 1, key, request, reason, timestamp,
+                 after.transaction_type, after.amount_rupiah, after.category, after.description, after.occurred_at),
+            )
+            return Correction(operation_id, transaction_id, version + 1, reason, timestamp, key, before, after)
 
     def list_transactions(
         self, *, start_date: str | None = None, end_date: str | None = None,
@@ -203,19 +381,19 @@ class TransactionStore:
         """Return in time/ID order; both local calendar dates are inclusive."""
         params = _bounds(start_date, end_date)
         params["kind"] = _type(transaction_type) if transaction_type is not None else None
-        with self._connection() as conn:
+        with self._connection(snapshot=True) as conn:
             rows = conn.execute(
-                "SELECT * FROM transactions" + _FILTER
+                "SELECT * FROM (" + _effective_sql(conn) + ")" + _FILTER
                 + "AND (:kind IS NULL OR transaction_type = :kind) ORDER BY occurred_at, id",
                 params,
             )
-            return [Transaction(**dict(row)) for row in rows]
+            return [Transaction(**{key: row[key] for key in row.keys() if key != "version"}) for row in rows]
 
     def cash_flow(self, *, start_date: str | None = None, end_date: str | None = None) -> CashFlow:
         """Sum exact integers without SQLite SUM's signed-64-bit overflow."""
         income = expense = count = 0
-        with self._connection() as conn:
-            rows = conn.execute("SELECT transaction_type, amount_rupiah FROM transactions" + _FILTER,
+        with self._connection(snapshot=True) as conn:
+            rows = conn.execute("SELECT transaction_type, amount_rupiah FROM (" + _effective_sql(conn) + ")" + _FILTER,
                                 _bounds(start_date, end_date))
             for kind, amount in rows:
                 if kind == "income":
