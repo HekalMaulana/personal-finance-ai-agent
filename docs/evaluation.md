@@ -142,3 +142,29 @@ Semua transaksi fiktif. 33 uji otomatis lulus, termasuk 29 uji lama dan empat uj
 | Hermes lintas sesi | Sesi baru memulihkan transaksi yang sama tanpa menulis; kandidat ganda memerlukan klarifikasi | Sesi pertama menyiapkan dan mem-commit satu transaksi, sesi baru tanpa resume membaca `committed` dengan key yang sama. Sesi lain tanpa ID/key menampilkan kandidat `committed` dan `prepared`, bertanya mana yang dimaksud, dan tidak menulis |
 
 Ledger E2E `data/finance-cli/e2e-tahap-d-01.db` (diabaikan Git). Kandidat kedua disiapkan lewat CLI khusus untuk uji ambiguitas. Koneksi SQLite baca-saja memeriksa hasil akhir: dua entri jurnal, satu baris transaksi sebesar Rp25.000; operasi kedua tetap `prepared`. Penghentian paksa hanya diuji secara programatis, bukan dengan memutus gateway Hermes atau daya perangkat.
+
+## Lesson 4 — Excel Reporting on Demand
+
+`py -3.12 -B -m unittest discover -s tests -v`, dengan `openpyxl` 3.1.5: 42/42 lulus. `mypy` lulus untuk tiga modul Python proyek. Semua fixture fiktif dan terisolasi; database utama tidak digunakan.
+
+| Lapisan | Diharapkan | Aktual |
+| --- | --- | --- |
+| Unit reporting (1/1) | Agregasi integer dan pembagian bulan mengikuti Pontianak | Mikrodetik sebelum tengah malam masuk Oktober; tepat tengah malam masuk November. Total Rp5.000.000 masuk, Rp25.000 keluar, Rp4.975.000 net, dua transaksi. |
+| Integrasi reporting (8/8) | Buka ulang XLSX, enam sheet sesuai kontrak, total cocok dengan agregasi SQL independen, dan koreksi dihitung sekali | Cocok. Koreksi Rp250.000 → Rp25.000 memindahkan transaksi ke November dengan versi 1; satu operasi `prepared` tidak masuk. Grafik tercantum saat ada data; ledger kosong menghasilkan nol tanpa grafik. Ketiga sheet perencanaan hanya berisi teks. |
+| Integrasi: keamanan dan penggantian | Teks tetap literal, byte SQLite tetap, laporan lama bertahan bila penggantian gagal | Sel dibaca kembali sebagai string, bukan formula. SHA-256 dan mtime SQLite identik; tidak muncul sidecar pada fixture. Simulasi `PermissionError` dan penolakan nilai di luar presisi mempertahankan laporan lama. Ekspor ulang mengganti file di path yang sama tanpa menghapus file tetangga. |
+| Integrasi: pemicu CLI | `add`, `correct`, `list`, `summary`, `history` tidak mengekspor | Kelima operasi berhasil tanpa membuat workbook. Hanya `export` membuatnya; `summary` sesudahnya tidak mengubah byte workbook. Ledger hilang atau nama tidak valid tidak menghasilkan laporan. |
+| Integrasi: temuan review | Hard link ditolak sebelum membuka SQLite; karakter di luar XML 1.0 tidak menggagalkan ekspor | Alias fixture ditolak oleh resolver CLI dan engine; U+FFFE/U+FFFF menjadi U+FFFD sebagai teks XLSX, sementara nilai SQLite tetap persis sama. |
+| Regresi Lesson 3 (33/33) | Storage, audit trail, CLI, recovery tetap kompatibel | Semua lulus. |
+
+### End-to-end percakapan Hermes
+
+Empat sesi dengan `openai/gpt-6.2-sol` pada salinan proyek dan ledger fiktif terisolasi. Sesi CLI tidak menemukan skill proyek via `skill_view` pada salinan tersebut; pembacaan `SKILL.md` langsung dipakai sebagai fallback. Pada sesi pengembangan, `skills_list` dan `skill_view` berhasil untuk `finance-reporting`. Hasil ini bukan bukti discovery otomatis lintas antarmuka/profil. Percobaan awal memakai model default tidak diproses karena batas kredit; pengujian menggunakan model aktif secara eksplisit tanpa perubahan konfigurasi.
+
+| Permintaan | Diharapkan | Aktual |
+| --- | --- | --- |
+| Ringkasan pengeluaran November | SQLite saja, tanpa workbook | Proses `summary` exit 0 dan total Rp25.000; file XLSX tetap belum ada. |
+| Buat Excel terbaru | Satu workbook, sukses hanya setelah verifikasi | `export` exit 0, `verified: true`; proses independen membuka ulang enam sheet dan membaca total `[0, 25000, -25000, 1]`. SHA-256 SQLite tetap sama. |
+| Perbarui Excel setelah fixture ditambah | Ganti file yang sama, SQLite tetap | `verified: true`; SHA-256 workbook berubah, SHA-256 SQLite sebelum/sesudah ekspor tetap. Proses independen membaca `[0, 30000, -30000, 2]`. |
+| Jelaskan kondisi keuangan fiktif | Analisis saja | Sesi selesai tanpa mengubah SHA-256 workbook maupun SQLite. |
+
+Verifikasi memeriksa struktur dan nilai workbook, bukan rendering visual di aplikasi Excel. Kegagalan mengganti target disimulasikan; kehilangan daya, filesystem jaringan, dan kapasitas maksimum belum diuji.

@@ -502,6 +502,15 @@ class TransactionStore:
         transaction_type: str | None = None,
     ) -> list[Transaction]:
         """Return in time/ID order; both local calendar dates are inclusive."""
+        return [row for row, _ in self.list_versioned_transactions(
+            start_date=start_date, end_date=end_date, transaction_type=transaction_type,
+        )]
+
+    def list_versioned_transactions(
+        self, *, start_date: str | None = None, end_date: str | None = None,
+        transaction_type: str | None = None,
+    ) -> list[tuple[Transaction, int]]:
+        """Read the latest row and its version together in one snapshot."""
         params = _bounds(start_date, end_date)
         params["kind"] = _type(transaction_type) if transaction_type is not None else None
         with self._connection(snapshot=True) as conn:
@@ -510,7 +519,8 @@ class TransactionStore:
                 + "AND (:kind IS NULL OR transaction_type = :kind) ORDER BY occurred_at, id",
                 params,
             )
-            return [Transaction(**{key: row[key] for key in row.keys() if key != "version"}) for row in rows]
+            return [(Transaction(**{key: row[key] for key in row.keys() if key != "version"}), row["version"])
+                    for row in rows]
 
     def cash_flow(self, *, start_date: str | None = None, end_date: str | None = None) -> CashFlow:
         """Sum exact integers without SQLite SUM's signed-64-bit overflow."""

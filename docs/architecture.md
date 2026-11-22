@@ -71,12 +71,21 @@ CLI JSON: `prepare-add` memakai skema `add`; `commit-add` menerima `operation_id
 
 Tidak ada proses yang memutar ulang otomatis, tidak ada jurnal terpisah, dan tidak ada penanda konfirmasi terkirim. Jurnal hanya untuk pencatatan baru; koreksi masih memakai mekanisme idempotensi dan audit Tahap C. Entri `prepared` tetap tersimpan jika ditinggalkan.
 
+## Laporan Excel atas permintaan — Lesson 4
+
+`Hermes → finance-reporting → finance_reporting.py --ledger NAMA export → TransactionStore (mode=ro) → SQLite → reports/laporan-keuangan.xlsx`. Ekspor merupakan operasi terpisah; CLI transaksi tidak mengimpor atau menjalankan reporting. Validasi nama ledger dipakai bersama dan menolak hard link sebelum SQLite dibuka. Tidak menerima path ledger atau output dari percakapan; tidak ada tugas terjadwal.
+
+- `list_versioned_transactions()` mengambil baris dan versi efektif bersama dalam satu snapshot SQLite. Dashboard, Transaksi, dan Bulanan diturunkan dari kumpulan baris yang sama; jurnal `prepared` tidak ikut. Data versi awal muncul sebagai versi 0. Pengelompokan memakai waktu efektif Asia/Pontianak (UTC+07:00); tanggal transaksi disimpan sebagai teks ISO 8601 agar offset dan mikrodetik tetap terlihat.
+- Agregasi memakai integer Rupiah; Dashboard menampilkan arus kas, bukan saldo rekening. Workbook menyimpan hasil hitung sebagai angka, bukan formula yang perlu dihitung ulang. Kategori/deskripsi disimpan sebagai sel teks literal. Karakter yang tidak valid dalam XML diganti U+FFFD di workbook saja; ledger tidak diubah. Grafik membandingkan pemasukan dan pengeluaran untuk bulan yang berisi transaksi.
+- Anggaran, Dana Darurat, dan Target Tabungan tidak memiliki penyimpanan terstruktur sehingga hanya menampilkan “Belum dikonfigurasi”. Workbook bukan sumber data kedua; perubahan manual tidak dibaca kembali dan akan tertimpa ekspor berikutnya.
+- Engine menyimpan file sementara di direktori tujuan, membukanya ulang untuk memeriksa nama sheet, jumlah baris rincian, dan total, lalu mengganti target melalui `os.replace`. Kegagalan sebelum atau pada penggantian tidak mengganti laporan lama; hanya file sementara milik ekspor yang dibersihkan. Keberhasilan dilaporkan setelah penggantian. Ini bukan jaminan ketahanan terhadap kehilangan daya; Excel yang sedang mengunci target dapat membuat pembaruan gagal.
+- Tidak ada paginasi atau ekspor *as of*. Batas sheet detail 1.048.572 transaksi (empat baris pendahulu); nilai yang tidak muat dalam 15 digit desimal numerik Excel ditolak agar tidak dibulatkan diam-diam. Hasil dari ledger yang berbeda tetap memakai satu path output yang sama.
+
 ## Desain berikutnya — belum diimplementasikan
 
 | Lapisan | Rancangan dan syarat verifikasi |
 | --- | --- |
 | Penggunaan SQLite di luar uji fiktif | Belum aktif. Evaluasi kontrol akses, penanganan kehilangan konteks, dan perilaku penolakan sebelum memperluas cakupan. |
-| Laporan Excel | Satu laporan, dibuat atau diperbarui hanya atas permintaan eksplisit. Perlakukan workbook sebagai keluaran turunan, bukan sumber data kedua. Verifikasi isi dan rumus terhadap sumber sebelum menyatakan berhasil. |
 | Penjadwalan | Rencana untuk tinjauan mingguan, evaluasi triwulanan dana darurat, dan pemulihan tinjauan yang terlewat ketika perangkat mati. Definisikan cara mencegah eksekusi ganda sebelum diaktifkan. |
 
 Urutan pengembangan yang disarankan: evaluasi perilaku agen → uji lapisan penyimpanan dengan data fiktif → verifikasi ekspor → evaluasi penjadwalan. Rancangan ini bukan izin untuk membuat database, integrasi, atau otomasi. Tidak ada tindakan perbankan atau investasi di dalam cakupan proyek.

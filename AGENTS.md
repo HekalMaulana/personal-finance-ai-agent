@@ -16,9 +16,12 @@
 - Untuk permintaan pencatatan eksplisit atau pembacaan ledger uji yang disepakati, gunakan skill proyek `finance-transactions` dan `finance_cli.py`. Jangan mencatat contoh atau analisis biasa. Pastikan keberhasilan dari hasil CLI aktual, bukan dari ingatan percakapan.
 - CLI hanya membuka ledger fiktif bernama di `data/finance-cli/`; jangan menggunakan `data/finance.db` dari percakapan.
 
+## Laporan Excel fiktif — Lesson 4
+- Untuk permintaan eksplisit membuat atau memperbarui laporan Excel, gunakan skill proyek `finance-reporting` pada ledger uji fiktif yang disepakati. Satu workbook lokal diturunkan dari SQLite baca-saja; jangan gunakan database utama.
+- Analisis, baca, pencatatan, koreksi, dan pemulihan tidak mengekspor laporan secara otomatis. Jangan mengklaim sukses tanpa verifikasi dari CLI ekspor.
+
 ## Rencana kemampuan — belum diaktifkan
 - Penggunaan pencatatan percakapan di luar ledger uji fiktif.
-- Satu laporan Excel, hanya dibuat atau diperbarui atas permintaan eksplisit pengguna.
 - Analisis keuangan setiap minggu.
 - Evaluasi kebutuhan dana darurat setiap tiga bulan.
 - Perencanaan tabungan untuk target pembelian barang.
@@ -30,7 +33,7 @@
 - Jangan memasang skill, MCP, atau dependensi tanpa persetujuan pengguna.
 - Jangan mengubah konfigurasi global Hermes.
 - Jangan mengakses atau mengubah proyek OpenCode lama.
-- Pengecualian untuk Lesson 3: basis data uji fiktif yang diotorisasi saja. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
+- Batas Lesson 3–4: gunakan hanya basis data uji fiktif yang diotorisasi. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
 
 ## Workflow dokumentasi dan Git
 1. Setelah perubahan penting, perbarui dokumentasi yang relevan (`README.md` atau `docs/`). Bedakan fitur yang sudah teruji (sertakan bukti), yang sedang dikembangkan, dan yang baru direncanakan. Jalankan pengujian yang relevan jika tersedia; catat yang tidak dijalankan dan alasannya.

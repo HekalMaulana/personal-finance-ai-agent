@@ -44,3 +44,9 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 
 - Menambahkan jurnal SQLite satu ledger dan status yang diturunkan dari keberadaan transaksi asli. Hermes menyiapkan ID sebelum mencatat dan membaca status sebelum retry.
 - Uji proses membuktikan pemulihan setelah penghentian sesudah commit dan setelah rollback insert. Uji Hermes lintas sesi membuktikan lookup dengan key dan klarifikasi ketika ada beberapa kandidat. Lihat [bukti uji](evaluation.md#lesson-3-tahap-d--pemulihan-pencatatan).
+
+## 2026-11-22 — Lesson 4: Excel Reporting on Demand
+
+- Memisahkan CLI ekspor dari CLI transaksi dan menambahkan `finance-reporting` untuk permintaan eksplisit. Engine memakai versi efektif dari satu snapshot baca-saja; tiga sheet perencanaan tetap belum dikonfigurasi.
+- Menggunakan `openpyxl` 3.1.5 yang sudah ada pada Python Windows 3.12. Tidak ada instalasi atau perubahan konfigurasi Hermes. Penulisan menggunakan file sementara yang diverifikasi sebelum penggantian.
+- Pengujian fixture mencakup pembukaan ulang XLSX, agregasi SQL independen, pergantian bulan lokal, koreksi, formula injection, ekspor ulang, serta kegagalan penggantian. Lihat [hasil dan batas verifikasi](evaluation.md#lesson-4--excel-reporting-on-demand).

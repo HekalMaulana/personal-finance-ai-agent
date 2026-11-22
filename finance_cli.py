@@ -65,7 +65,17 @@ def _request(operation: str) -> dict[str, Any]:
     return payload
 
 
-def _db_path(name: str) -> Path:
+def reject_hardlinked_ledger(path: Path) -> None:
+    """Reject aliases without opening or inspecting the protected database."""
+    try:
+        links = path.stat().st_nlink
+    except FileNotFoundError:
+        return  # Callers decide whether a missing ledger may be created.
+    if links > 1:
+        raise ValueError("Ledger tidak boleh memiliki tautan keras.")
+
+
+def ledger_path(name: str) -> Path:
     if not _LEDGER.fullmatch(name):
         raise ValueError("Nama ledger: 1–48 karakter ASCII huruf kecil, angka, atau tanda hubung; awali dengan huruf.")
     # Avoid Windows device names, including when followed by a suffix.
@@ -74,6 +84,7 @@ def _db_path(name: str) -> Path:
     path = _LEDGER_DIR / (name + ".db")
     if path.resolve() != path:
         raise ValueError("Lokasi ledger berupa tautan atau berada di luar lokasi yang diizinkan.")
+    reject_hardlinked_ledger(path)
     return path
 
 
@@ -93,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = parser.parse_args(argv)
         payload = _request(args.operation)
-        path = _db_path(args.ledger)
+        path = ledger_path(args.ledger)
         if args.operation == "operation-status" and (len(payload) != 1 or None in payload.values()):
             raise ValueError("Pilih tepat satu: operation_id atau idempotency_key.")
         creates = args.operation in ("add", "prepare-add")

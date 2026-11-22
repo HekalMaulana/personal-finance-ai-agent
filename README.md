@@ -20,7 +20,8 @@ Skill `personal-finance-analysis` tetap untuk analisis tanpa pencatatan. Skill [
 | Dalam pengembangan | Evaluasi konsistensi percakapan lintas sesi dan kasus tepi. Belum ada pengujian keamanan menyeluruh. |
 | Teruji end-to-end untuk ledger fiktif | Hermes memuat `finance-transactions`, mencatat dua transaksi, mengulangi satu permintaan tanpa duplikasi, dan membaca ringkasan dari proses CLI baru. Lihat [bukti dan batas uji](docs/evaluation.md#lesson-3-tahap-b--cli-dan-percakapan-hermes). |
 | Tersedia untuk ledger fiktif | Koreksi transaksi dengan riwayat append-only dan perlindungan versi lama. Gunakan `get` dengan `include_version: true`, lalu `correct` atau `history`. |
-| Direncanakan, belum aktif | Penggunaan database utama dari percakapan, laporan Excel atas permintaan eksplisit, tinjauan mingguan, evaluasi dana darurat triwulanan, dan pengecekan jadwal terlewat. |
+| Tersedia, teruji lewat CLI | Ekspor Excel atas permintaan eksplisit dari ledger fiktif; lihat [pengujian Lesson 4](docs/evaluation.md#lesson-4--excel-reporting-on-demand). |
+| Direncanakan, belum aktif | Penggunaan database utama dari percakapan, tinjauan mingguan, evaluasi dana darurat triwulanan, dan pengecekan jadwal terlewat. |
 
 ## Mencoba prototipe
 
@@ -30,7 +31,7 @@ Skill `personal-finance-analysis` tetap untuk analisis tanpa pencatatan. Skill [
 
 ### Menguji penyimpanan tanpa Hermes
 
-Dari root repositori, jalankan `python -B -m unittest discover -s tests -v` (atau `python3` jika itu nama executable lokal). Harness membuat database SQLite sementara yang terpisah dari `data/finance.db`, memverifikasi baris yang benar-benar ditulis, lalu membersihkan database uji. Gunakan hanya data fiktif.
+Untuk suite lengkap, jalankan `py -3.12 -B -m unittest discover -s tests -v` dari root dengan `openpyxl` tersedia. Uji Lesson 3 menggunakan ledger SQLite yang terpisah dari `data/finance.db`; uji Lesson 4 menggunakan direktori sementara tersendiri. Semua fixture fiktif.
 
 ### Mencoba CLI dengan ledger fiktif
 
@@ -52,6 +53,20 @@ Di ledger yang sama, gunakan `get` dengan `{"id":"<UUID>","include_version":true
 ### Memulihkan pencatatan setelah sesi berganti
 
 Untuk ledger fiktif, `prepare-add` menerima JSON yang sama seperti `add` dan menyimpan ID operasi sebelum mencatat transaksi. `commit-add` menerima `{"operation_id":"<UUID>"}`. Jika hasil tidak pasti, baca `operation-status` dengan ID atau `{"idempotency_key":"<key>"}` sebelum mencoba lagi. Jika keduanya hilang, `find-add` mencari kandidat, bukan menentukan identitas. Lihat [hasil uji pemulihan](docs/evaluation.md#lesson-3-tahap-d--pemulihan-pencatatan).
+
+### Membuat atau memperbarui laporan Excel
+
+Dari sesi Hermes di root proyek: “Buat laporan keuangan Excel terbaru untuk ledger fiktif lesson3-demo.” Untuk membuat ulang file yang sama: “Perbarui laporan Excel saya untuk ledger fiktif lesson3-demo.” Gunakan nama ledger fiktif yang sudah ada. Pertanyaan ringkasan pengeluaran saja tidak membuat file.
+
+CLI Windows (tidak perlu JSON stdin):
+
+```bash
+py -3.12 -B finance_reporting.py --ledger lesson3-demo export
+```
+
+Gunakan Python 3.12+ dengan `openpyxl` (`requirements-reporting.txt`). Python Windows 3.12 yang diperiksa sudah memiliki 3.1.5; `python3` bawaan Hermes yang diperiksa belum memilikinya. Siapkan dependensi hanya dengan persetujuan. Workbook `reports/laporan-keuangan.xlsx` adalah keluaran lokal yang diabaikan Git. Sheet Dashboard, Transaksi, dan Bulanan berasal dari versi transaksi efektif; Anggaran, Dana Darurat, dan Target Tabungan berstatus “Belum dikonfigurasi”. Pembaruan mengganti seluruh workbook, termasuk edit manual. Tutup file di Excel jika terkunci.
+
+Uji lengkap pada Windows: `py -3.12 -B -m unittest discover -s tests -v`.
 
 ## Dokumentasi pengembangan
 
