@@ -5,24 +5,30 @@ Prototipe asisten keuangan pribadi berbahasa Indonesia berbasis Hermes Agent. Pr
 ## Teknologi dan arsitektur
 
 - **Hermes Agent** menjalankan percakapan dan memuat skill proyek pada sesi yang memenuhi syarat. CLI yang diperiksa dalam pengembangan: v0.23.3.
-- **Markdown dan YAML frontmatter** mendefinisikan aturan proyek (`AGENTS.md`) dan prosedur analisis (`SKILL.md`). Repositori tidak menambahkan runtime aplikasi atau dependensi analisis sendiri.
-- **Git** mencatat perkembangan dokumentasi dan skill. `.gitignore` membantu mengecualikan artefak lokal, tetapi tidak menggantikan pemeriksaan sebelum commit.
+- **Markdown dan YAML frontmatter** mendefinisikan aturan proyek (`AGENTS.md`) dan prosedur analisis (`SKILL.md`).
+- **Python 3.12+ dan `sqlite3`** menyediakan penyimpanan lokal mandiri tanpa dependensi eksternal. Lokasi default adalah `data/finance.db`.
+- **Git** mencatat perkembangan kode, dokumentasi, dan skill. `.gitignore` membantu mengecualikan database dan artefak lokal, tetapi tidak menggantikan pemeriksaan sebelum commit.
 
-Alur saat ini: **masukan fiktif → validasi dan klarifikasi → perhitungan eksplisit → rekomendasi dalam percakapan**. Tidak ada penulisan transaksi atau penyimpanan saldo oleh prototipe ini. Lihat [arsitektur](docs/architecture.md) untuk alur dan batas antar komponen.
+Analisis percakapan Hermes tidak membaca atau menulis database. Penyimpanan berjalan terpisah melalui modul Python. Lihat [arsitektur](docs/architecture.md) untuk skema dan batas kedua komponen.
 
 ## Status proyek
 
 | Status | Cakupan |
 | --- | --- |
 | Tersedia, evaluasi awal lulus | Tiga uji percakapan lulus: penemuan skill, analisis keuangan fiktif, dan estimasi dengan data tidak lengkap. Lihat [hasil dan batas evaluasi](docs/evaluation.md). |
-| Dalam pengembangan | Evaluasi konsistensi lintas sesi dan kasus tepi. Belum ada suite evaluasi otomatis atau pengujian keamanan menyeluruh. |
-| Direncanakan, belum aktif | Pencatatan transaksi melalui percakapan, SQLite lokal sebagai sumber data, satu laporan Excel atas permintaan eksplisit, tinjauan mingguan, evaluasi dana darurat triwulanan, serta pengecekan jadwal terlewat. Perencanaan target saat ini hanya berupa estimasi dalam percakapan, bukan pelacakan kemajuan yang tersimpan. |
+| Tersedia, teruji mandiri | Penyimpanan SQLite lokal untuk data fiktif: tambah, baca, filter, total arus kas, dan retry idempoten. |
+| Dalam pengembangan | Evaluasi konsistensi percakapan lintas sesi dan kasus tepi. Belum ada pengujian keamanan menyeluruh. |
+| Direncanakan, belum aktif | Integrasi penyimpanan dengan percakapan, koreksi dengan audit trail, satu laporan Excel atas permintaan eksplisit, tinjauan mingguan, evaluasi dana darurat triwulanan, serta pengecekan jadwal terlewat. Perencanaan target dalam percakapan belum melacak kemajuan secara persisten. |
 
 ## Mencoba prototipe
 
 1. Buka sesi Hermes dari direktori repositori. Skill ada di [`.hermes/skills/personal-finance-analysis/SKILL.md`](.hermes/skills/personal-finance-analysis/SKILL.md). Jika belum tersedia di sesi, periksa penemuan skill proyek dan status kepercayaan repositori. Sebagai alternatif, minta agen membaca `SKILL.md` langsung; pembacaan manual tidak membuktikan penemuan otomatis.
 2. Gunakan skenario fiktif di [dokumen evaluasi](docs/evaluation.md). Minta agen menampilkan rumus, asumsi, pertanyaan klarifikasi, dan saran yang tidak melebihi surplus rutin.
 3. Cocokkan hasil dengan nilai pembanding. Jangan masukkan data rekening, kredensial, atau transaksi asli.
+
+### Menguji penyimpanan tanpa Hermes
+
+Dari root repositori, jalankan `python -B -m unittest discover -s tests -v` (atau `python3` jika itu nama executable lokal). Harness membuat database SQLite sementara yang terpisah dari `data/finance.db`, memverifikasi baris yang benar-benar ditulis, lalu membersihkan database uji. Gunakan hanya data fiktif.
 
 ## Dokumentasi pengembangan
 

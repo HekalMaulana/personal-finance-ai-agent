@@ -21,3 +21,9 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 - Tiga pengujian percakapan lulus: penemuan dan pemuatan resmi skill, analisis bulanan dengan data fiktif, serta estimasi bersyarat ketika saldo awal dan setoran rutin belum diketahui.
 - [Dokumen evaluasi](evaluation.md#evaluasi-awal-personal-finance-analysis--2026-11-22) mencatat hasil yang diharapkan, hasil aktual, bukti, dan keterbatasan tiap uji. Tidak ada kegagalan yang menuntut perubahan pada `SKILL.md`.
 - Keamanan hanya diamati dari perilaku yang dilaporkan, belum diuji menyeluruh. Konsistensi lintas konteks dan kasus tepi tetap menjadi pekerjaan lanjutan.
+
+## 2026-11-22 — Lesson 3: penyimpanan SQLite mandiri
+
+- Menambahkan `finance_storage.py` dan harness `unittest` tanpa dependensi runtime baru. API memakai nominal integer, waktu Pontianak UTC+07:00, UUID, dan idempotency key unik. Tidak ada API ubah atau hapus.
+- Sebelas uji lulus dengan file SQLite sementara yang terpisah dari `data/finance.db`, termasuk insert tiga transaksi fiktif, persistensi, batas hari lokal, dan retry bersamaan. Lihat [hasil evaluasi](evaluation.md#lesson-3--penyimpanan-sqlite-mandiri).
+- Pembatasan analisis Hermes tetap berlaku: belum ada integrasi percakapan atau akses data asli. Koreksi dengan audit trail masih berupa [rancangan](architecture.md#rancangan-koreksi--belum-diimplementasikan).

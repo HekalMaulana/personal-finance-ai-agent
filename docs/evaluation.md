@@ -9,7 +9,7 @@
 | Penemuan lewat CLI mandiri | `hermes skills list --enabled-only` dari root repositori tidak menampilkan nama skill saat diperiksa. | Penyebab perbedaan konteks belum diuji; tidak ada perubahan konfigurasi atau izin trust. |
 | Rumus inti skill | Perhitungan pembanding dijalankan dengan `awk` dan semua nilai di bawah cocok dengan hasil yang diperiksa. | Uji aritmetika atas satu skenario, bukan eksekusi otomatis `SKILL.md` atau uji end-to-end agen. |
 
-Tidak ada suite pengujian otomatis aplikasi di repositori. SQLite, Excel, dan penjadwalan belum diimplementasikan atau diuji. Tidak ada akses data keuangan asli dalam evaluasi ini.
+Pada tahap baseline ini belum ada suite pengujian otomatis; SQLite, Excel, dan penjadwalan belum diimplementasikan atau diuji. Hasil pengujian SQLite yang ditambahkan kemudian tercatat pada bagian Lesson 3. Tidak ada akses data keuangan asli dalam evaluasi ini.
 
 ## Skenario pembanding: surplus bulanan
 
@@ -75,3 +75,23 @@ Keamanan hanya diamati dari perilaku yang dilaporkan: jawaban menggunakan skenar
 | Pengguna meminta konfirmasi penyimpanan | Agen menjelaskan bahwa tidak ada transaksi yang disimpan. |
 
 Jalankan tiap kasus dalam sesi baru, catat versi runtime dan apakah skill dimuat, lalu bandingkan keluaran dengan kriteria. Simpan hanya ringkasan yang telah diperiksa, bukan transkrip mentah.
+
+## Lesson 3 — Penyimpanan SQLite mandiri
+
+**Simulasi — data fiktif.** `python3 -B -m unittest discover -s tests -v`: 11 uji lulus dengan Python 3.14.9 dan SQLite 3.53.1. Setiap uji memakai file tersendiri di `data/.lesson3-test-*/finance-test.db`; file uji dibersihkan dan `data/finance.db` tidak dibuka oleh pengujian.
+
+| Uji | Diharapkan | Aktual |
+| --- | --- | --- |
+| Tiga transaksi: Gaji Rp5.000.000, Makanan Rp25.000, Transportasi Rp150.000 | Tiga UUID berbeda; income Rp5.000.000, expense Rp175.000, net Rp4.825.000; rentang kosong menghasilkan nol | Sesuai; tiga baris dibaca dan total tepat; rentang kosong bernilai nol |
+| Buka ulang file | UUID yang disimpan mengembalikan transaksi asli; UUID yang tidak ada menghasilkan `None` | Sesuai; satu baris dan totalnya tetap tersedia setelah koneksi ditutup dan store dibuka ulang |
+| Nominal | Negatif, nol, boolean, float, string, dan overflow ditolak | Semuanya `ValueError`; tidak ada baris tersimpan |
+| Tipe tidak dikenal | Ditolak untuk tambah dan filter | `transfer` ditolak dengan `ValueError` |
+| Teks dan tanggal tidak valid | Tolak kategori kosong/terlalu panjang, teks/key tidak valid, waktu/offset/tanggal tidak valid, rentang terbalik, dan UUID cacat | Semua kasus menjalankan jalur `ValueError` |
+| Retry identik | Satu baris, ID dan waktu catat asli meski instan dinyatakan dengan offset berbeda | Baris asli dikembalikan; tidak ada duplikasi |
+| Retry konflik | Tolak nominal berbeda dengan key sama; jangan ubah data asli | `IdempotencyConflict` dengan pesan jelas; baris asli tetap satu |
+| Retry bersamaan | Dua pemanggil dengan key dan payload sama memperoleh satu transaksi | Kedua hasil identik dan hanya satu baris tersimpan |
+| Hari lokal dan tipe | Sertakan tengah malam dan mikrodetik terakhir; kecualikan sesaat sebelum hari dan awal hari berikutnya; filter `expense` hanya mengembalikan pengeluaran | Sesuai; waktu skrip masukan UTC dinormalisasi ke `+07:00`, waktu pencatatan ber-offset `+07:00`, dan total hari tepat |
+| Teks dengan tanda baca | Simpan tanda kutip dan titik koma sebagai teks, bukan SQL | Teks yang dibaca sama persis dan jumlah baris tetap satu |
+| Total melampaui batas satu integer SQLite | Agregat tetap presisi sebagai integer | Jumlah dua nominal maksimum tepat |
+
+Pengecekan tipe `mypy` juga lulus. Pengujian ini bukan audit keamanan menyeluruh: belum mencakup crash/pemulihan daya, beban jangka panjang, file yang dimodifikasi di luar API, ataupun integrasi Hermes.
