@@ -26,4 +26,10 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 
 - Menambahkan `finance_storage.py` dan harness `unittest` tanpa dependensi runtime baru. API memakai nominal integer, waktu Pontianak UTC+07:00, UUID, dan idempotency key unik. Tidak ada API ubah atau hapus.
 - Sebelas uji lulus dengan file SQLite sementara yang terpisah dari `data/finance.db`, termasuk insert tiga transaksi fiktif, persistensi, batas hari lokal, dan retry bersamaan. Lihat [hasil evaluasi](evaluation.md#lesson-3--penyimpanan-sqlite-mandiri).
-- Pembatasan analisis Hermes tetap berlaku: belum ada integrasi percakapan atau akses data asli. Koreksi dengan audit trail masih berupa [rancangan](architecture.md#rancangan-koreksi--belum-diimplementasikan).
+- Pada tahap ini belum ada integrasi percakapan atau akses data asli. Koreksi dengan audit trail masih berupa [rancangan](architecture.md#rancangan-koreksi--belum-diimplementasikan).
+
+## 2026-11-22 — Lesson 3 Tahap B: CLI dan skill transaksi
+
+- Menambahkan CLI JSON `add`, `get`, `list`, dan `summary` serta skill proyek `finance-transactions`. Storage engine tetap menangani validasi, query berparameter, penyimpanan atomik, dan idempotensi. Perubahan engine terbatas pada mode baca-saja dan inisialisasi opsional saat penambahan valid.
+- Sebelas uji engine dan delapan uji integrasi CLI lulus. Uji percakapan baru memuat skill melalui mekanisme resmi, menulis dua transaksi uji, melakukan retry idempoten, dan membaca kembali melalui proses CLI baru. Verifikasi SQLite baca-saja mengonfirmasi dua baris dengan ID yang sama. Database utama tidak digunakan.
+- Preload via `--skills` tidak berhasil di gateway yang diuji; discovery dari dalam sesi berhasil. PTY Windows mengirim JSON melalui stdin tanpa mengubah kebijakan persetujuan. Lihat [bukti dan batas uji](evaluation.md#lesson-3-tahap-b--cli-dan-percakapan-hermes).

@@ -94,4 +94,19 @@ Jalankan tiap kasus dalam sesi baru, catat versi runtime dan apakah skill dimuat
 | Teks dengan tanda baca | Simpan tanda kutip dan titik koma sebagai teks, bukan SQL | Teks yang dibaca sama persis dan jumlah baris tetap satu |
 | Total melampaui batas satu integer SQLite | Agregat tetap presisi sebagai integer | Jumlah dua nominal maksimum tepat |
 
-Pengecekan tipe `mypy` juga lulus. Pengujian ini bukan audit keamanan menyeluruh: belum mencakup crash/pemulihan daya, beban jangka panjang, file yang dimodifikasi di luar API, ataupun integrasi Hermes.
+Pengecekan tipe `mypy` juga lulus. Evaluasi engine ini bukan audit keamanan menyeluruh: pada tahap tersebut belum mencakup crash/pemulihan daya, beban jangka panjang, file yang dimodifikasi di luar API, ataupun integrasi Hermes.
+
+## Lesson 3 Tahap B — CLI dan percakapan Hermes
+
+**Simulasi — data fiktif.** Python 3.14.9, SQLite 3.53.1, dan Hermes CLI v0.23.3. Database utama `data/finance.db` tidak digunakan.
+
+| Lapisan | Diharapkan | Aktual dan bukti |
+| --- | --- | --- |
+| Uji storage (`test_storage.py`) | Sebelas uji awal tetap lulus tanpa Hermes | 11/11 lulus, termasuk persistensi, idempotensi bersamaan, validasi, dan batas hari lokal. |
+| Integrasi CLI (`test_finance_cli.py`) | JSON dan kode keluar konsisten untuk add/get/list/summary, validasi, konflik dan error storage; retry tidak menggandakan; baca tidak membuat/mengubah database | 8/8 lulus dengan proses Python terpisah dan ledger `data/finance-cli/test-*.db` yang dibersihkan. Hash dan mtime file tidak berubah setelah operasi baca. Tanda kutip dan metakarakter tetap literal; inspeksi kode CLI tidak menemukan eksekusi shell atau SQL dari payload. |
+| Percakapan Hermes | Temukan dan muat skill, jalankan dua add, retry identik, lalu baca hasil dari proses CLI baru | `skills_list` dan `skill_view` berhasil di sesi baru. Kedua `add` mengembalikan exit 0 dan `ok:true`; `get` dari proses terpisah mengembalikan kedua ID yang sama. Retry pengeluaran mengembalikan ID dan waktu pencatatan yang sama. |
+| Verifikasi independen setelah percakapan | Isi database cocok dengan keluaran alat dan jumlah tetap dua | Koneksi SQLite `mode=ro` menemukan tepat dua baris dengan ID yang sama; proses CLI `summary` terpisah cocok dengan hasil percakapan. |
+
+Ledger E2E: `data/finance-cli/e2e-tahap-b-01.db` (diabaikan Git). `summary` mengembalikan `ok:true`, `total_income:5000000`, `total_expense:25000`, `net_cash_flow:4975000`, `transaction_count:2`, seluruhnya sesuai ekspektasi. Baris Gaji muncul pada 08:00 dan Makanan pada 12:00, 1 November 2026 UTC+07:00. Tidak ada seed CLI manual sebelum sesi ini. Verifikasi setelah sesi hanya membaca.
+
+Gateway menolak opsi `--run-budget` dan preload `--skills` menghasilkan `unknown_skill`; penemuan **dari dalam sesi** berhasil. Kebijakan satu kueri menolak heredoc dan Python `-c`; sesi memakai PTY Windows dengan JSON di stdin dan menunggu exit code proses. Tidak ada pengaturan global yang diubah. Skenario utama memakai tanggal, kategori, dan key eksplisit. Dalam sesi baru terpisah, permintaan mencatat pengeluaran makan siang tanpa waktu membuat Hermes meminta tanggal dan jam, menyatakan belum menyimpan, dan tidak memanggil CLI. Ini belum membuktikan konsistensi lintas profil, klarifikasi seluruh kasus ambigu, atau pemulihan key setelah konteks hilang. Bukan audit keamanan menyeluruh.

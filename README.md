@@ -9,7 +9,7 @@ Prototipe asisten keuangan pribadi berbahasa Indonesia berbasis Hermes Agent. Pr
 - **Python 3.12+ dan `sqlite3`** menyediakan penyimpanan lokal mandiri tanpa dependensi eksternal. Lokasi default adalah `data/finance.db`.
 - **Git** mencatat perkembangan kode, dokumentasi, dan skill. `.gitignore` membantu mengecualikan database dan artefak lokal, tetapi tidak menggantikan pemeriksaan sebelum commit.
 
-Analisis percakapan Hermes tidak membaca atau menulis database. Penyimpanan berjalan terpisah melalui modul Python. Lihat [arsitektur](docs/architecture.md) untuk skema dan batas kedua komponen.
+Skill `personal-finance-analysis` tetap untuk analisis tanpa pencatatan. Skill [`finance-transactions`](.hermes/skills/finance-transactions/SKILL.md) menghubungkan permintaan eksplisit ke CLI untuk ledger uji fiktif saja. Lihat [arsitektur](docs/architecture.md) untuk skema dan batas akses.
 
 ## Status proyek
 
@@ -18,7 +18,8 @@ Analisis percakapan Hermes tidak membaca atau menulis database. Penyimpanan berj
 | Tersedia, evaluasi awal lulus | Tiga uji percakapan lulus: penemuan skill, analisis keuangan fiktif, dan estimasi dengan data tidak lengkap. Lihat [hasil dan batas evaluasi](docs/evaluation.md). |
 | Tersedia, teruji mandiri | Penyimpanan SQLite lokal untuk data fiktif: tambah, baca, filter, total arus kas, dan retry idempoten. |
 | Dalam pengembangan | Evaluasi konsistensi percakapan lintas sesi dan kasus tepi. Belum ada pengujian keamanan menyeluruh. |
-| Direncanakan, belum aktif | Integrasi penyimpanan dengan percakapan, koreksi dengan audit trail, satu laporan Excel atas permintaan eksplisit, tinjauan mingguan, evaluasi dana darurat triwulanan, serta pengecekan jadwal terlewat. Perencanaan target dalam percakapan belum melacak kemajuan secara persisten. |
+| Teruji end-to-end untuk ledger fiktif | Hermes memuat `finance-transactions`, mencatat dua transaksi, mengulangi satu permintaan tanpa duplikasi, dan membaca ringkasan dari proses CLI baru. Lihat [bukti dan batas uji](docs/evaluation.md#lesson-3-tahap-b--cli-dan-percakapan-hermes). |
+| Direncanakan, belum aktif | Koreksi dengan audit trail, penggunaan database utama dari percakapan, laporan Excel atas permintaan eksplisit, tinjauan mingguan, evaluasi dana darurat triwulanan, dan pengecekan jadwal terlewat. |
 
 ## Mencoba prototipe
 
@@ -29,6 +30,19 @@ Analisis percakapan Hermes tidak membaca atau menulis database. Penyimpanan berj
 ### Menguji penyimpanan tanpa Hermes
 
 Dari root repositori, jalankan `python -B -m unittest discover -s tests -v` (atau `python3` jika itu nama executable lokal). Harness membuat database SQLite sementara yang terpisah dari `data/finance.db`, memverifikasi baris yang benar-benar ditulis, lalu membersihkan database uji. Gunakan hanya data fiktif.
+
+### Mencoba CLI dengan ledger fiktif
+
+Contoh di Bash dari root repositori (jangan pakai data nyata). Gunakan nama ledger yang sama untuk baca dan tulis:
+
+```bash
+python3 -B finance_cli.py --ledger lesson3-demo add <<'FINANCE_JSON'
+{"transaction_type":"expense","amount_rupiah":25000,"category":"Makanan","occurred_at":"2026-11-01T12:00:00+07:00","idempotency_key":"demo-makan-01"}
+FINANCE_JSON
+printf '%s\n' '{}' | python3 -B finance_cli.py --ledger lesson3-demo summary
+```
+
+Untuk `get`, kirim `{"id":"<UUID hasil add>"}`; untuk `list`, kirim `{}` atau filter `start_date`, `end_date`, dan `transaction_type`. Dalam percakapan Hermes, pastikan `finance-transactions` ditemukan melalui `skills_list()` dan dimuat melalui `skill_view()`, lalu sebutkan ledger dan data fiktif yang memang diminta untuk disimpan. Tidak perlu mengubah konfigurasi global jika preload `--skills` ditolak.
 
 ## Dokumentasi pengembangan
 

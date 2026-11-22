@@ -21,7 +21,7 @@ Jawaban percakapan: fakta simulasi, asumsi, hitungan, risiko, saran
 | Hermes Agent | Menjalankan dialog dan, bila tersedia serta diperlukan, memakai alat hitung. Skill berisi prosedur, bukan program yang mengeksekusi transaksi. |
 | Git dan dokumentasi | Menyimpan instruksi dan bukti pengembangan yang telah ditinjau, bukan data keuangan atau log sesi. |
 
-Analisis menghitung arus kas sebelum alokasi tabungan, saving rate dari tabungan bersih yang benar-benar terjadi dalam simulasi, dan rasio pengeluaran terhadap pemasukan bersih. Dana darurat dinilai terhadap pengeluaran esensial bulanan. Estimasi target memakai saldo yang khusus dialokasikan dan setoran rutin yang realistis. Alur percakapan ini tidak terhubung ke database; hal ini bukan jaminan layanan Hermes atau penyedia model tidak mencatat percakapan. Jangan memasukkan data asli.
+Analisis menghitung arus kas sebelum alokasi tabungan, saving rate dari tabungan bersih yang benar-benar terjadi dalam simulasi, dan rasio pengeluaran terhadap pemasukan bersih. Dana darurat dinilai terhadap pengeluaran esensial bulanan. Estimasi target memakai saldo yang khusus dialokasikan dan setoran rutin yang realistis. Skill analisis ini tidak terhubung ke database; jalur transaksi di bawah terpisah. Ini bukan jaminan layanan Hermes atau penyedia model tidak mencatat percakapan. Jangan memasukkan data asli.
 
 ## Penyimpanan mandiri — Lesson 3
 
@@ -43,6 +43,15 @@ Analisis menghitung arus kas sebelum alokasi tabungan, saving rate dari tabungan
 - Input divalidasi di Python dan nilai SQL di-bind dengan parameter. Skema menegakkan batas inti dan keunikan; indeks `(occurred_at, id)` mendukung urutan waktu. Pengecekan key dan insert berada dalam satu transaksi `BEGIN IMMEDIATE`. Payload identik setelah normalisasi (termasuk waktu yang mewakili instan yang sama) mengembalikan baris asli; konflik tidak mengubahnya. Setiap operasi menutup koneksinya. Total dihitung dengan integer Python agar tidak overflow pada batas agregat SQLite.
 - Batas tahap ini: database lokal tidak dienkripsi oleh modul; API bukan batas izin terhadap pihak yang bisa menulis langsung ke file. Belum ada paginasi, migrasi versi skema, backup/restore, atau pengujian crash dan beban. Daftar mengumpulkan semua baris yang cocok; total memindai baris yang cocok.
 
+## Jalur percakapan untuk transaksi fiktif — Lesson 3 Tahap B
+
+`Hermes → finance-transactions → finance_cli.py → TransactionStore → SQLite`. Skill memeriksa maksud pencatatan, meminta klarifikasi untuk detail ambigu, dan hanya mengonfirmasi hasil `add` jika proses CLI selesai dengan exit 0 dan data hasil cocok. Permintaan analisis biasa tidak mengikuti jalur ini.
+
+- CLI memerlukan `--ledger NAMA`; nama ASCII yang lolos allowlist dipetakan ke `data/finance-cli/NAMA.db`, bukan path dari payload atau `data/finance.db`. Gunakan ledger yang sama untuk seluruh operasi dalam satu skenario. Lokasi ini mengasumsikan workspace lokal tepercaya dan bukan batas isolasi terhadap pihak yang bisa memodifikasi file secara langsung.
+- CLI membaca satu objek JSON UTF-8 maksimal 8192 byte dari stdin. Operasi dan field di-allowlist; nilai diteruskan ke API Python, bukan dieksekusi sebagai perintah shell atau SQL. `get`, `list`, dan `summary` memakai koneksi SQLite `mode=ro` tanpa inisialisasi skema. Ledger yang belum ada tidak dibuat oleh operasi baca.
+- Sukses: exit `0` dan `{ "ok": true, "operation": "...", "data": ... }`. Kesalahan: `{ "ok": false, "error": { "code": "...", "message": "..." } }`, dengan exit `2` input tidak valid, `3` konflik idempotensi, `4` ledger/transaksi tidak ditemukan, dan `5` kesalahan penyimpanan.
+- Key dan payload ditetapkan sebelum pemanggilan pertama. Retry aman hanya jika ledger, key, dan payload tetap sama. Engine menegakkan keunikan key per ledger, tetapi skill tidak memiliki penyimpanan untuk memulihkan identitas operasi di luar konteks percakapan. Jika identitas tidak pasti, baca atau minta klarifikasi sebelum mencoba lagi.
+
 ### Rancangan koreksi — belum diimplementasikan
 
 Tidak ada API ubah atau hapus. Rancang koreksi sebagai entri audit append-only yang mereferensikan UUID asli dan mencatat alasan, aktor, waktu, serta idempotency key. Simpan entri pembalik dan transaksi pengganti opsional secara atomik tanpa mengubah baris asli. Tetapkan aturan periode pelaporan agar koreksi tidak dihitung ganda. Sebelum diaktifkan, uji rollback atomik, retry, konflik, koreksi berulang, dan rekonsiliasi total serta audit trail.
@@ -51,8 +60,7 @@ Tidak ada API ubah atau hapus. Rancang koreksi sebagai entri audit append-only y
 
 | Lapisan | Rancangan dan syarat verifikasi |
 | --- | --- |
-| Pencatatan percakapan | Pisahkan kandidat transaksi dari tindakan simpan. Validasi nominal, periode, dan kategori; minta klarifikasi bila ambigu. Konfirmasi keberhasilan hanya setelah hasil simpan diverifikasi. |
-| Penggunaan SQLite dari Hermes | Hubungkan penyimpanan yang sudah teruji mandiri hanya setelah kontrak konfirmasi, idempotency key, dan penanganan kegagalan simpan diuji dari percakapan. File database dan berkas pendampingnya tidak masuk Git. |
+| Penggunaan SQLite di luar uji fiktif | Belum aktif. Evaluasi kontrol akses, penanganan kehilangan konteks, dan perilaku penolakan sebelum memperluas cakupan. |
 | Laporan Excel | Satu laporan, dibuat atau diperbarui hanya atas permintaan eksplisit. Perlakukan workbook sebagai keluaran turunan, bukan sumber data kedua. Verifikasi isi dan rumus terhadap sumber sebelum menyatakan berhasil. |
 | Penjadwalan | Rencana untuk tinjauan mingguan, evaluasi triwulanan dana darurat, dan pemulihan tinjauan yang terlewat ketika perangkat mati. Definisikan cara mencegah eksekusi ganda sebelum diaktifkan. |
 

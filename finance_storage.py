@@ -114,18 +114,27 @@ def _bounds(start_date: str | None, end_date: str | None) -> dict[str, str | Non
 class TransactionStore:
     """Initialize a local ledger; use only a trusted application or test path."""
 
-    def __init__(self, db_path: str | Path = DEFAULT_DB_PATH) -> None:
+    def __init__(self, db_path: str | Path = DEFAULT_DB_PATH, *,
+                 read_only: bool = False, defer_init: bool = False) -> None:
         self._path = Path(db_path).resolve()
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connection() as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            conn.execute(_SCHEMA)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_time ON transactions (occurred_at, id)")
+        self._read_only = read_only
+        self._defer_init = defer_init
+        if not read_only and not defer_init:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            with self._connection() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                self._initialize(conn)
+
+    @staticmethod
+    def _initialize(conn: sqlite3.Connection) -> None:
+        conn.execute(_SCHEMA)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_transactions_time ON transactions (occurred_at, id)")
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
         # Explicit BEGIN/COMMIT for writes; reads use SQLite autocommit.
-        conn = sqlite3.connect(self._path, timeout=5, autocommit=True)
+        target = self._path.as_uri() + "?mode=ro" if self._read_only else str(self._path)
+        conn = sqlite3.connect(target, uri=self._read_only, timeout=5, autocommit=True)
         try:
             conn.row_factory = sqlite3.Row
             yield conn
@@ -148,9 +157,13 @@ class TransactionStore:
         timestamp = _transaction_time(occurred_at)
         key = _text(idempotency_key, "Idempotency key", 128, strip=False)
         payload = (kind, amount_rupiah, category, description, timestamp)
+        if self._defer_init and not self._read_only:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._connection() as conn:
             # Reserve the writer lock before checking for an existing key.
             conn.execute("BEGIN IMMEDIATE")
+            if self._defer_init and not self._read_only:
+                self._initialize(conn)
             row = conn.execute(
                 "SELECT * FROM transactions WHERE idempotency_key = ?", (key,)
             ).fetchone()
