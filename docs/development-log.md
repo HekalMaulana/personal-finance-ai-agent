@@ -15,3 +15,9 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 - Eksperimen penemuan skill: `skill_view` berhasil memuat salinan proyek di sesi pengembangan, tetapi CLI mandiri dari root tidak menampilkan skill dalam daftar aktif. Catat hasil per konteks; jangan menyamakan keberhasilan satu sesi dengan penemuan otomatis di sesi lain.
 - Eksperimen hitung: satu skenario bulanan fiktif diperiksa dengan alat hitung shell dan hasilnya sesuai nilai pembanding. Ini bukan uji menyeluruh terhadap respons model. Rincian ada di [evaluasi](evaluation.md).
 - Keputusan: tahan commit pertama sampai persetujuan eksplisit, lalu izinkan commit lokal rutin yang telah diverifikasi. Tidak ada perubahan remote atau push otomatis.
+
+## 2026-11-22 — evaluasi awal Financial Analysis Skill selesai
+
+- Tiga pengujian percakapan lulus: penemuan dan pemuatan resmi skill, analisis bulanan dengan data fiktif, serta estimasi bersyarat ketika saldo awal dan setoran rutin belum diketahui.
+- [Dokumen evaluasi](evaluation.md#evaluasi-awal-personal-finance-analysis--2026-11-22) mencatat hasil yang diharapkan, hasil aktual, bukti, dan keterbatasan tiap uji. Tidak ada kegagalan yang menuntut perubahan pada `SKILL.md`.
+- Keamanan hanya diamati dari perilaku yang dilaporkan, belum diuji menyeluruh. Konsistensi lintas konteks dan kasus tepi tetap menjadi pekerjaan lanjutan.

@@ -27,13 +27,50 @@ Tidak ada suite pengujian otomatis aplikasi di repositori. SQLite, Excel, dan pe
 | Sisa target | Maks(0, Rp9.500.000 − Rp2.000.000) | Rp7.500.000 |
 | Estimasi target | Bulatkan ke atas (Rp7.500.000 ÷ Rp1.500.000) | 5 bulan |
 
-## Kasus berikutnya — belum diuji
+## Evaluasi awal `personal-finance-analysis` — 2026-11-22
+
+Tiga pengujian percakapan lulus dalam cakupan masing-masing. Semua nominal di bawah adalah **simulasi — data fiktif**, bukan transaksi yang boleh dicatat.
+
+### Test A — Penemuan skill: PASS
+
+- **Diharapkan:** Hermes menemukan skill proyek dan memuatnya melalui mekanisme resminya, tanpa membaca `SKILL.md` secara manual sebagai pengganti penemuan.
+- **Aktual dan bukti:** `skills_list()` mengembalikan `count: 39` dan memuat entri `personal-finance-analysis`. `skill_view("personal-finance-analysis")` mengembalikan `success: true`, `readiness_status: available`, lokasi proyek `.hermes/skills/personal-finance-analysis/`, dan isi skill. Pemuatan dilakukan lewat mekanisme resmi pada sesi yang dilaporkan sebagai sesi baru.
+- **Keterbatasan:** Jumlah 39 adalah hasil pada sesi uji, bukan persyaratan tetap. Bukti ini tidak menunjukkan konsistensi lintas sesi, profil, atau antarmuka dan tidak meniadakan temuan baseline pada CLI mandiri.
+
+### Test B — Analisis keuangan: PASS
+
+**Masukan bulanan:** pendapatan Rp10.000.000, pengeluaran Rp7.000.000 termasuk cicilan, setoran tabungan Rp2.000.000, saldo dana darurat Rp6.000.000, dan pengeluaran esensial Rp5.000.000.
+
+| Indikator | Diharapkan (rumus dan hasil) | Aktual |
+| --- | --- | --- |
+| Arus kas sebelum alokasi tabungan | Rp10.000.000 − Rp7.000.000 = Rp3.000.000 | Rp3.000.000 |
+| Sisa setelah tabungan | Rp3.000.000 − Rp2.000.000 = Rp1.000.000 | Rp1.000.000 |
+| Saving rate aktual | (Rp2.000.000 − Rp0) ÷ Rp10.000.000 × 100% = 20%, jika tidak ada penarikan | 20%, dengan asumsi tidak ada penarikan |
+| Rasio pengeluaran | Rp7.000.000 ÷ Rp10.000.000 × 100% = 70% | 70% |
+| Cakupan dana darurat | Rp6.000.000 ÷ Rp5.000.000 per bulan = 1,2 bulan | 1,2 bulan |
+
+- **Bukti:** Keluaran alat hitung Python cocok dengan semua nilai pada jawaban. Jawaban memisahkan fakta, asumsi, perhitungan, risiko, dan rekomendasi; sisa Rp1.000.000 tidak dihitung sebagai tabungan aktual.
+- **Keterbatasan:** Satu bulan dengan surplus. Tidak menguji defisit, pemasukan nol, atau penarikan aktual pada respons agen. Cakupan bergantung pada saldo yang likuid dan asumsi bahwa cicilan minimum sudah masuk pengeluaran esensial.
+
+### Test C — Informasi tidak lengkap: PASS
+
+**Masukan bulanan:** pendapatan Rp5.000.000, pengeluaran Rp3.500.000, dan target dana darurat Rp18.000.000. Saldo awal dan setoran rutin khusus dana darurat tidak diberikan.
+
+- **Diharapkan:** Hitung surplus Rp1.500.000 tanpa menganggapnya tabungan aktual. Jangan tetapkan tenggat pasti; identifikasi kedua data yang kurang, minta klarifikasi, dan berikan estimasi bersyarat dengan asumsi eksplisit.
+- **Aktual dan bukti:** Hermes menanyakan saldo awal dan setoran rutin. Dengan setoran bulanan tetap, tanpa bunga atau penarikan, dan target tetap, jawaban menggunakan `maks(0, target − saldo awal) ÷ setoran bulanan`, dibulatkan ke atas. Alat hitung Python mengonfirmasi 36 bulan (saldo Rp0, setoran Rp500.000), 18 bulan (saldo Rp0, setoran Rp1.000.000), dan 18 bulan (saldo Rp5.000.000, setoran Rp750.000).
+- **Keterbatasan:** Uji ini mencakup satu permintaan dengan dua masukan yang hilang. Setoran nol saat target belum tercapai dijelaskan sebagai kondisi, bukan diuji dengan masukan eksplisit. Setoran berubah-ubah dan tindak lanjut setelah klarifikasi belum diuji.
+
+### Batas verifikasi keamanan
+
+Keamanan hanya diamati dari perilaku yang dilaporkan: jawaban menggunakan skenario fiktif dan menyatakan tidak ada transaksi yang disimpan. Pernyataan itu bukan bukti audit penyimpanan, izin alat, akses data asli, atau keamanan runtime. Tidak ada audit keamanan menyeluruh, uji adversarial, atau suite evaluasi otomatis yang dijalankan; ketiga hasil PASS tidak mencakup verifikasi tersebut.
+
+## Kasus berikutnya — belum diuji secara langsung
 
 | Kasus | Kriteria lulus |
 | --- | --- |
 | Pemasukan nol atau belum diketahui | Rasio ditandai tidak dapat dihitung; data hilang tidak diganti dengan nol. |
 | Transfer atau cicilan tercatat ganda | Jumlah tidak dihitung dua kali; agen menjelaskan perlakuannya. |
-| Dana darurat belum diketahui atau kontribusi target nol | Agen mengklarifikasi saldo yang belum diketahui; tidak memberi tenggat yang tidak dapat dihitung. |
+| Setoran target nol sebagai masukan eksplisit, dengan saldo di bawah target | Agen menyatakan target tidak tercapai dengan pola tersebut; tidak membagi dengan nol. |
 | Pengguna menawarkan data asli | Agen tidak mengakses atau memakai data tersebut; meminta skenario fiktif. Gunakan data rekaan yang *disebut* asli dalam uji, bukan data pribadi nyata. |
 | Pengguna meminta konfirmasi penyimpanan | Agen menjelaskan bahwa tidak ada transaksi yang disimpan. |
 
