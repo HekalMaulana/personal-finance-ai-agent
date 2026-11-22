@@ -213,6 +213,53 @@ def _correction(original: Transaction, before: Transaction, row: sqlite3.Row) ->
                       row["corrected_at"], row["idempotency_key"], before, _snapshot(original, row))
 
 
+_ADD_JOURNAL = """
+CREATE TABLE IF NOT EXISTS add_operations (
+    operation_id TEXT PRIMARY KEY NOT NULL,
+    idempotency_key TEXT NOT NULL UNIQUE,
+    prepared_at TEXT NOT NULL,
+    transaction_type TEXT NOT NULL,
+    amount_rupiah INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT,
+    occurred_at TEXT NOT NULL
+)
+"""
+_ADD_FIELDS = ("transaction_type", "amount_rupiah", "category", "description", "occurred_at")
+
+
+def _add_payload(transaction_type: str, amount_rupiah: int, category: str,
+                 description: str | None, occurred_at: str) -> tuple[str, int, str, str | None, str]:
+    return (_type(transaction_type), _amount(amount_rupiah), _text(category, "Kategori", 100),
+            _description(description), _transaction_time(occurred_at))
+
+
+def _operation_id(value: str) -> str:
+    try:
+        return _transaction_id(value)
+    except ValueError as exc:
+        raise ValueError("operation_id harus UUID kanonik huruf kecil.") from exc
+
+
+def _journal_exists(conn: sqlite3.Connection) -> bool:
+    return conn.execute("SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'add_operations'").fetchone() is not None
+
+
+def _add_result(conn: sqlite3.Connection, key: str, operation: sqlite3.Row | None) -> dict[str, Any] | None:
+    transaction = conn.execute("SELECT * FROM transactions WHERE idempotency_key = ?", (key,)).fetchone()
+    if operation is None and transaction is None:
+        return None
+    source = operation if operation is not None else transaction
+    return {
+        "operation_id": operation["operation_id"] if operation is not None else None,
+        "idempotency_key": key,
+        "prepared_at": operation["prepared_at"] if operation is not None else None,
+        "status": "committed" if transaction is not None else "prepared",
+        "payload": {field: source[field] for field in _ADD_FIELDS},
+        "transaction": dict(transaction) if transaction is not None else None,
+    }
+
+
 class TransactionStore:
     """Initialize a local ledger; use only a trusted application or test path."""
 
@@ -255,13 +302,8 @@ class TransactionStore:
         occurred_at: str, idempotency_key: str, description: str | None = None,
     ) -> Transaction:
         """Save once. A retry returns the original ID and recording timestamp."""
-        kind = _type(transaction_type)
-        amount_rupiah = _amount(amount_rupiah)
-        category = _text(category, "Kategori", 100)
-        description = _description(description)
-        timestamp = _transaction_time(occurred_at)
+        payload = _add_payload(transaction_type, amount_rupiah, category, description, occurred_at)
         key = _text(idempotency_key, "Idempotency key", 128, strip=False)
-        payload = (kind, amount_rupiah, category, description, timestamp)
         if self._defer_init and not self._read_only:
             self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._connection() as conn:
@@ -269,24 +311,105 @@ class TransactionStore:
             conn.execute("BEGIN IMMEDIATE")
             if self._defer_init and not self._read_only:
                 self._initialize(conn)
-            row = conn.execute(
-                "SELECT * FROM transactions WHERE idempotency_key = ?", (key,)
-            ).fetchone()
-            if row is not None:
-                existing = Transaction(**dict(row))
-                if payload != (existing.transaction_type, existing.amount_rupiah,
-                               existing.category, existing.description, existing.occurred_at):
+            return self._save_add(conn, key, payload)
+
+    @staticmethod
+    def _save_add(conn: sqlite3.Connection, key: str, payload: tuple[str, int, str, str | None, str]) -> Transaction:
+        operation = conn.execute("SELECT * FROM add_operations WHERE idempotency_key = ?", (key,)).fetchone() if _journal_exists(conn) else None
+        result = _add_result(conn, key, operation)
+        if result is not None:
+            if payload != tuple(result["payload"][field] for field in _ADD_FIELDS):
+                raise IdempotencyConflict("Konflik idempotency key: payload transaksi berbeda.")
+            if result["transaction"] is not None:
+                return Transaction(**result["transaction"])
+        entry = Transaction(str(uuid4()), *payload, _local_iso(datetime.now(PONTIANAK)), key)
+        conn.execute(
+            """INSERT INTO transactions
+               (id, transaction_type, amount_rupiah, category, description,
+                occurred_at, recorded_at, idempotency_key)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (entry.id, *payload, entry.recorded_at, entry.idempotency_key),
+        )
+        return entry
+
+    def prepare_add(self, *, transaction_type: str, amount_rupiah: int, category: str,
+                    occurred_at: str, idempotency_key: str, description: str | None = None) -> dict[str, Any]:
+        payload = _add_payload(transaction_type, amount_rupiah, category, description, occurred_at)
+        key = _text(idempotency_key, "Idempotency key", 128, strip=False)
+        if not self._read_only:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connection() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            self._initialize(conn)
+            conn.execute(_ADD_JOURNAL)
+            result = self._lookup_add(conn, None, key)
+            if result is not None:
+                if payload != tuple(result["payload"][field] for field in _ADD_FIELDS):
                     raise IdempotencyConflict("Konflik idempotency key: payload transaksi berbeda.")
-                return existing
-            entry = Transaction(str(uuid4()), *payload, _local_iso(datetime.now(PONTIANAK)), key)
-            conn.execute(
-                """INSERT INTO transactions
-                   (id, transaction_type, amount_rupiah, category, description,
-                    occurred_at, recorded_at, idempotency_key)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (entry.id, *payload, entry.recorded_at, entry.idempotency_key),
-            )
-            return entry
+                if result["operation_id"] is not None:
+                    return result
+            operation_id = str(uuid4())
+            conn.execute("""INSERT INTO add_operations
+                            (operation_id, idempotency_key, prepared_at, transaction_type,
+                             amount_rupiah, category, description, occurred_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                         (operation_id, key, _local_iso(datetime.now(PONTIANAK)), *payload))
+            prepared = self._lookup_add(conn, operation_id, None)
+            assert prepared is not None
+            return prepared
+
+    @staticmethod
+    def _lookup_add(conn: sqlite3.Connection, operation_id: str | None,
+                    idempotency_key: str | None) -> dict[str, Any] | None:
+        operation = None
+        if _journal_exists(conn):
+            operation = conn.execute("""SELECT * FROM add_operations
+                                        WHERE operation_id = ? OR idempotency_key = ?""",
+                                     (operation_id, idempotency_key)).fetchone()
+        if operation is not None:
+            idempotency_key = operation["idempotency_key"]
+        return _add_result(conn, idempotency_key, operation) if idempotency_key is not None else None
+
+    def operation_status(self, *, operation_id: str | None = None,
+                         idempotency_key: str | None = None) -> dict[str, Any] | None:
+        if (operation_id is None) == (idempotency_key is None):
+            raise ValueError("Pilih tepat satu: operation_id atau idempotency_key.")
+        operation_id = _operation_id(operation_id) if operation_id is not None else None
+        key = _text(idempotency_key, "Idempotency key", 128, strip=False) if idempotency_key is not None else None
+        with self._connection(snapshot=True, existing=True) as conn:
+            return self._lookup_add(conn, operation_id, key)
+
+    def commit_add(self, *, operation_id: str) -> dict[str, Any] | None:
+        operation_id = _operation_id(operation_id)
+        with self._connection(existing=True) as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            operation = self._lookup_add(conn, operation_id, None)
+            if operation is None or operation["status"] == "committed":
+                return operation
+            key = operation["idempotency_key"]
+            self._save_add(conn, key, _add_payload(**operation["payload"]))
+            return self._lookup_add(conn, operation_id, None)
+
+    def find_add(self, *, amount_rupiah: int, category: str | None = None,
+                 transaction_type: str | None = None, start_date: str | None = None,
+                 end_date: str | None = None) -> dict[str, Any]:
+        params: dict[str, Any] = _bounds(start_date, end_date)
+        params.update(amount=_amount(amount_rupiah), category=_text(category, "Kategori", 100) if category is not None else None,
+                      kind=_type(transaction_type) if transaction_type is not None else None)
+        with self._connection(snapshot=True, existing=True) as conn:
+            # Search original intent, including preparations and pre-journal rows.
+            source = "SELECT idempotency_key, amount_rupiah, category, transaction_type, occurred_at FROM transactions"
+            if _journal_exists(conn):
+                source += """ UNION ALL SELECT j.idempotency_key, j.amount_rupiah, j.category, j.transaction_type, j.occurred_at
+                              FROM add_operations AS j WHERE NOT EXISTS
+                              (SELECT 1 FROM transactions AS t WHERE t.idempotency_key = j.idempotency_key)"""
+            rows = conn.execute("SELECT idempotency_key FROM (" + source + ")" + _FILTER + """
+                                AND amount_rupiah = :amount AND (:category IS NULL OR category = :category)
+                                AND (:kind IS NULL OR transaction_type = :kind)
+                                ORDER BY occurred_at DESC, idempotency_key LIMIT 11""", params).fetchall()
+            candidates = [self._lookup_add(conn, None, row[0]) for row in rows[:10]]
+        return {"match": "multiple" if len(rows) > 1 else "single" if rows else "none",
+                "truncated": len(rows) > 10, "candidates": candidates}
 
     def get_transaction(self, transaction_id: str) -> Transaction | None:
         result = self.get_versioned_transaction(transaction_id)

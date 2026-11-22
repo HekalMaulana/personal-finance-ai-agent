@@ -39,3 +39,8 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 - Menambahkan revisi append-only dengan versi, key idempoten, alasan, dan waktu koreksi. Baris asli tidak berubah; pembacaan efektif hanya mengambil revisi terakhir. Pembuatan tabel aditif diuji pada skema lama.
 - Menambahkan `correct`, `history`, dan versi opsional pada `get`. Hermes menampilkan pratinjau baca-saja sebelum konfirmasi dan tidak membentuk key baru untuk retry yang belum pasti.
 - Seluruh 29 uji otomatis lulus, termasuk regresi JSON ASCII untuk field Unicode maksimum. E2E dua giliran dan verifikasi SQLite terpisah mengonfirmasi tepat satu revisi Rp250.000 → Rp25.000. Lihat [bukti uji](evaluation.md#lesson-3-tahap-c--koreksi-dan-audit-trail).
+
+## 2026-11-22 — Lesson 3 Tahap D: pemulihan pencatatan
+
+- Menambahkan jurnal SQLite satu ledger dan status yang diturunkan dari keberadaan transaksi asli. Hermes menyiapkan ID sebelum mencatat dan membaca status sebelum retry.
+- Uji proses membuktikan pemulihan setelah penghentian sesudah commit dan setelah rollback insert. Uji Hermes lintas sesi membuktikan lookup dengan key dan klarifikasi ketika ada beberapa kandidat. Lihat [bukti uji](evaluation.md#lesson-3-tahap-d--pemulihan-pencatatan).

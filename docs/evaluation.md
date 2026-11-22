@@ -127,4 +127,18 @@ Gateway menolak opsi `--run-budget` dan preload `--skills` menghasilkan `unknown
 
 Ledger E2E: `data/finance-cli/e2e-tahap-c-01.db` (diabaikan Git). Transaksi awal disiapkan lewat CLI untuk menguji alur koreksi pada percakapan; penulisan revisi dijalankan Hermes. Koneksi SQLite baca-saja yang independen menemukan satu baris asli Rp250.000 dan satu baris audit versi 1 Rp25.000 dengan alasan “Salah input”, waktu UTC+07:00, dan foreign key valid. Summary independen menghasilkan pemasukan Rp0, pengeluaran Rp25.000, arus kas −Rp25.000, satu transaksi.
 
-Batas uji: konfirmasi dengan ID dan key eksplisit pada satu sesi gateway; pemulihan key lintas sesi, autentikasi aktor, manipulasi file langsung, beban tinggi, dan pemulihan crash belum diverifikasi.
+Batas uji: konfirmasi dengan ID dan key eksplisit pada satu sesi gateway; pemulihan key lintas sesi, autentikasi aktor, manipulasi file langsung, beban tinggi, dan pemulihan crash belum diverifikasi pada Tahap C.
+
+## Lesson 3 Tahap D — Pemulihan pencatatan
+
+Semua transaksi fiktif. 33 uji otomatis lulus, termasuk 29 uji lama dan empat uji integrasi proses baru; `mypy` lulus.
+
+| Kasus/lapisan | Diharapkan | Aktual |
+| --- | --- | --- |
+| Proses CLI: putus setelah commit | Proses baru menemukan transaksi tanpa duplikasi | Subproses dihentikan di titik setelah SQLite commit dan sebelum JSON sukses. Lookup dengan ID dan key serta retry mengembalikan transaksi sama; koneksi baca-saja menemukan satu baris |
+| Proses CLI: gagal setelah persiapan | Jurnal bertahan, transaksi tidak tersisa, retry aman | Trigger fixture `AFTER INSERT` memicu rollback. Status tetap `prepared`; setelah trigger dilepas, operasi yang sama menghasilkan satu baris |
+| Proses CLI: dua transaksi identik | Dua identitas berbeda boleh tercatat; pencarian tidak menyatukan kandidat | Dua key dan UUID berbeda menghasilkan dua baris; `find-add` mengembalikan `multiple` |
+| Proses CLI: kompatibilitas/validasi | Key lama dapat dibaca; payload berbeda dengan key direservasi ditolak | Sesuai; bentuk JSON status yang tidak valid juga ditolak |
+| Hermes lintas sesi | Sesi baru memulihkan transaksi yang sama tanpa menulis; kandidat ganda memerlukan klarifikasi | Sesi pertama menyiapkan dan mem-commit satu transaksi, sesi baru tanpa resume membaca `committed` dengan key yang sama. Sesi lain tanpa ID/key menampilkan kandidat `committed` dan `prepared`, bertanya mana yang dimaksud, dan tidak menulis |
+
+Ledger E2E `data/finance-cli/e2e-tahap-d-01.db` (diabaikan Git). Kandidat kedua disiapkan lewat CLI khusus untuk uji ambiguitas. Koneksi SQLite baca-saja memeriksa hasil akhir: dua entri jurnal, satu baris transaksi sebesar Rp25.000; operasi kedua tetap `prepared`. Penghentian paksa hanya diuji secara programatis, bukan dengan memutus gateway Hermes atau daya perangkat.

@@ -49,6 +49,10 @@ Untuk `get`, kirim `{"id":"<UUID hasil add>"}`; untuk `list`, kirim `{}` atau fi
 
 Di ledger yang sama, gunakan `get` dengan `{"id":"<UUID>","include_version":true}`. Setelah meninjau versi dan nilai sebelum/sesudah, kirim JSON ke `correct`, misalnya `{"id":"<UUID>","expected_version":0,"changes":{"amount_rupiah":25000},"reason":"Salah input","idempotency_key":"demo-correct-01"}`. Gunakan versi dan UUID dari hasil baca, bukan nilai contoh. `history` menerima `{"id":"<UUID>"}`. Di Hermes, skill menampilkan pratinjau dan menunggu konfirmasi sebelum menulis. Lihat [hasil uji Tahap C](docs/evaluation.md#lesson-3-tahap-c--koreksi-dan-audit-trail).
 
+### Memulihkan pencatatan setelah sesi berganti
+
+Untuk ledger fiktif, `prepare-add` menerima JSON yang sama seperti `add` dan menyimpan ID operasi sebelum mencatat transaksi. `commit-add` menerima `{"operation_id":"<UUID>"}`. Jika hasil tidak pasti, baca `operation-status` dengan ID atau `{"idempotency_key":"<key>"}` sebelum mencoba lagi. Jika keduanya hilang, `find-add` mencari kandidat, bukan menentukan identitas. Lihat [hasil uji pemulihan](docs/evaluation.md#lesson-3-tahap-d--pemulihan-pencatatan).
+
 ## Dokumentasi pengembangan
 
 - [Arsitektur](docs/architecture.md) — alur saat ini, batas keamanan, dan rancangan fitur berikutnya.

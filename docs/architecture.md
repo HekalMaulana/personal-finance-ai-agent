@@ -61,6 +61,16 @@ Analisis menghitung arus kas sebelum alokasi tabungan, saving rate dari tabungan
 - `list` dan `cash_flow` (`summary`) memakai satu versi terakhir per ID, baru menerapkan filter. Perubahan tipe mengalihkan kelompok pemasukan/pengeluaran; perubahan waktu memindahkan transaksi ke periode efektif baru. Tidak ada baris pembalik atau penghitungan ganda. Ringkasan historis dapat berubah; pelaporan *as of* belum tersedia.
 - Trade-off: snapshot menambah ruang dan biaya join dibanding mengganti baris, tetapi menjaga versi lama dan audit secara sederhana. Klien lama tetap dapat membuka skema, namun versi kode lama dan kueri langsung `transactions` tidak melihat koreksi. Audit append-only ditegakkan oleh API, bukan bukti anti-tamper terhadap akses file langsung. Identitas aktor dan otorisasi multi-pengguna belum tersedia.
 
+## Pemulihan pencatatan — Lesson 3 Tahap D
+
+Sebelumnya key baru dapat terbentuk saat konteks sesi hilang. SQLite bisa sudah commit meski respons tidak sampai; timeout bukan bukti kegagalan. Sebaliknya, dua pembelian sah dapat memiliki isi identik sehingga deduplikasi berdasarkan isi akan membuang transaksi yang sah.
+
+Tabel aditif `add_operations` pada ledger yang sama menyimpan `operation_id` UUID, `idempotency_key` unik, `prepared_at`, dan payload pencatatan ternormalisasi. `prepare_add()` menyelesaikan commit jurnal sebelum `commit_add()` dapat menulis ledger. Pencatatan menggunakan lock `BEGIN IMMEDIATE`, payload yang disimpan, dan key yang sama. `operation_status()` membaca snapshot konsisten. Status **diturunkan** dari sumber kebenaran, bukan disimpan di flag terpisah: `prepared` = jurnal ada tanpa baris transaksi yang terlihat pada saat baca; `committed` = baris asli dengan key tersebut ada. Karena insert ledger sekaligus menentukan status, tidak ada jendela antara commit ledger dan pembaruan flag. Status tidak membuktikan respons telah diterima pengguna.
+
+CLI JSON: `prepare-add` memakai skema `add`; `commit-add` menerima `operation_id`; `operation-status` menerima tepat satu ID operasi atau key; `find-add` memakai nominal dan dapat dipersempit dengan kategori, tipe, dan tanggal lokal. Pencarian menampilkan maksimal sepuluh kandidat berdasarkan nilai asli, termasuk operasi belum commit. Satu kecocokan bukan bukti identitas. `add` lama tetap kompatibel dan tunduk pada key yang sudah direservasi. Transaksi lama dapat ditemukan dari key tanpa UUID jurnal (`operation_id: null`). Pembacaan ledger lama tidak membuat jurnal. Gunakan `get` untuk nilai efektif setelah koreksi; status pencatatan menampilkan baris asli.
+
+Tidak ada proses yang memutar ulang otomatis, tidak ada jurnal terpisah, dan tidak ada penanda konfirmasi terkirim. Jurnal hanya untuk pencatatan baru; koreksi masih memakai mekanisme idempotensi dan audit Tahap C. Entri `prepared` tetap tersimpan jika ditinggalkan.
+
 ## Desain berikutnya — belum diimplementasikan
 
 | Lapisan | Rancangan dan syarat verifikasi |

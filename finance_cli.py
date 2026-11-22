@@ -20,6 +20,10 @@ _MAX_REQUEST = 16 * 1024
 _DATES = {"start_date", "end_date"}
 _FIELDS = {
     "add": ({"transaction_type", "amount_rupiah", "category", "occurred_at", "idempotency_key"}, {"description"}),
+    "prepare-add": ({"transaction_type", "amount_rupiah", "category", "occurred_at", "idempotency_key"}, {"description"}),
+    "commit-add": ({"operation_id"}, set()),
+    "operation-status": (set(), {"operation_id", "idempotency_key"}),
+    "find-add": ({"amount_rupiah"}, _DATES | {"category", "transaction_type"}),
     "get": ({"id"}, {"include_version"}),
     "correct": ({"id", "expected_version", "changes", "reason", "idempotency_key"}, set()),
     "history": ({"id"}, set()),
@@ -30,7 +34,7 @@ _FIELDS = {
 
 class _Parser(argparse.ArgumentParser):
     def error(self, message: str) -> Never:
-        raise ValueError("Gunakan --ledger NAMA dan operasi add, get, list, summary, correct, atau history.")
+        raise ValueError("Gunakan --ledger NAMA dan operasi yang tersedia di --help.")
 
 
 def _unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -90,12 +94,24 @@ def main(argv: list[str] | None = None) -> int:
         args = parser.parse_args(argv)
         payload = _request(args.operation)
         path = _db_path(args.ledger)
-        writing = args.operation in ("add", "correct")
-        if args.operation != "add" and not path.exists():
-            return _emit(4, code="database_not_found", message="Ledger belum ada; hanya add dapat membuat ledger.")
+        if args.operation == "operation-status" and (len(payload) != 1 or None in payload.values()):
+            raise ValueError("Pilih tepat satu: operation_id atau idempotency_key.")
+        creates = args.operation in ("add", "prepare-add")
+        writing = creates or args.operation in ("correct", "commit-add")
+        if not creates and not path.exists():
+            return _emit(4, code="database_not_found", message="Ledger belum ada.")
         store = TransactionStore(path, read_only=not writing, defer_init=writing)
         if args.operation == "add":
             data: Any = asdict(store.add_transaction(**payload))
+        elif args.operation == "prepare-add":
+            data = store.prepare_add(**payload)
+        elif args.operation in ("commit-add", "operation-status"):
+            data = (store.commit_add(**payload) if args.operation == "commit-add"
+                    else store.operation_status(**payload))
+            if data is None:
+                return _emit(4, code="operation_not_found", message="Identitas operasi tidak ditemukan; jangan menebak hasilnya.")
+        elif args.operation == "find-add":
+            data = store.find_add(**payload)
         elif args.operation == "correct":
             target = payload.pop("id")
             data = asdict(store.correct_transaction(target, **payload))
