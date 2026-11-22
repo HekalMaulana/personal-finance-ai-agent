@@ -23,6 +23,9 @@
 ## Anggaran bulanan fiktif — Lesson 5A
 - Gunakan skill `finance-budgets` dan CLI terstruktur pada ledger fiktif yang sudah ada dan disepakati. Pertanyaan anggaran hanya membaca SQLite. Tinjau nilai lama dan baru, lalu tunggu konfirmasi eksplisit sebelum mengubah anggaran yang sudah ada. Verifikasi hasil dari SQLite; tidak ada ekspor otomatis.
 
+## Dana darurat fiktif — Lesson 5B
+- Gunakan `finance-emergency` pada ledger fiktif yang sudah ada dan disepakati. Saldo adalah alokasi yang dilaporkan pengguna, bukan saldo bank. Jangan menggandakan mutasi sebagai transaksi umum. Tinjau dan konfirmasi penggantian konfigurasi atau saldo awal; verifikasi dari SQLite. Tidak ada ekspor otomatis.
+
 ## Rencana kemampuan — belum diaktifkan
 - Penggunaan pencatatan percakapan di luar ledger uji fiktif.
 - Analisis keuangan setiap minggu.
@@ -36,7 +39,7 @@
 - Jangan memasang skill, MCP, atau dependensi tanpa persetujuan pengguna.
 - Jangan mengubah konfigurasi global Hermes.
 - Jangan mengakses atau mengubah proyek OpenCode lama.
-- Batas Lesson 3–5A: gunakan hanya basis data uji fiktif yang diotorisasi. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
+- Batas Lesson 3–5B: gunakan hanya basis data uji fiktif yang diotorisasi. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
 
 ## Workflow dokumentasi dan Git
 1. Setelah perubahan penting, perbarui dokumentasi yang relevan (`README.md` atau `docs/`). Bedakan fitur yang sudah teruji (sertakan bukti), yang sedang dikembangkan, dan yang baru direncanakan. Jalankan pengujian yang relevan jika tersedia; catat yang tidak dijalankan dan alasannya.

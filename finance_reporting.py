@@ -14,6 +14,7 @@ from zipfile import BadZipFile
 
 from finance_budgets import BudgetStore, BudgetSummary
 from finance_cli import _Parser, _emit, ledger_path, reject_hardlinked_ledger
+from finance_emergency import FundSummary, read_fund_summary
 from finance_storage import DEFAULT_DB_PATH, PONTIANAK, Transaction
 
 if TYPE_CHECKING:
@@ -29,6 +30,9 @@ MAX_EXCEL_INTEGER = 10**15 - 1
 Totals = tuple[int, int, int, int]
 BUDGET_HEADER = ("Periode", "Kategori", "Anggaran (Rp)", "Realisasi (Rp)", "Sisa (Rp)", "Penggunaan", "Status")
 BudgetCells = tuple[str, str, int, int, int, float, str]
+FUND_HEADER = ("Saldo alokasi (Rp)", "Esensial / bulan (Rp)", "Target (bulan)", "Target (Rp)",
+               "Progres", "Cakupan (bulan)", "Kekurangan (Rp)")
+FundCells = tuple[int | None, int | None, int | None, int | None, float | None, float | None, int | None]
 
 
 def _excel_text(value: str) -> str:
@@ -102,7 +106,7 @@ def _tabular_rows(ws: "Worksheet", header: tuple[str, ...],
 
 
 def _workbook(rows: list[tuple[Transaction, int]], ledger: str, totals: Totals,
-              months: list[tuple[str, Totals]], budgets: list[BudgetCells]) -> "Workbook":
+              months: list[tuple[str, Totals]], budgets: list[BudgetCells], fund: FundCells | None) -> "Workbook":
     from openpyxl import Workbook
     from openpyxl.chart import BarChart, Reference
     from openpyxl.chart.data_source import AxDataSource, StrData, StrRef, StrVal
@@ -111,7 +115,7 @@ def _workbook(rows: list[tuple[Transaction, int]], ledger: str, totals: Totals,
     dashboard = wb.active
     assert dashboard is not None
     dashboard.title = SHEETS[0]
-    data, monthly, budget_sheet, *unconfigured = [wb.create_sheet(name) for name in SHEETS[1:]]
+    data, monthly, budget_sheet, fund_sheet, savings = [wb.create_sheet(name) for name in SHEETS[1:]]
     subtitle = f"Simulasi — data fiktif | Ledger: {ledger} | Asia/Pontianak (UTC+07:00)"
     _sheet_header(dashboard, "Laporan Keuangan", subtitle, (26, 26, 24, 24, 20))
     _tabular_rows(dashboard, ("Metrik", "Nilai"), zip(
@@ -153,10 +157,20 @@ def _workbook(rows: list[tuple[Transaction, int]], ledger: str, totals: Totals,
     else:
         budget_sheet["A4"] = "Belum dikonfigurasi"
         budget_sheet.freeze_panes = "A4"
-    for ws in unconfigured:
-        _sheet_header(ws, ws.title, subtitle, (27, 26, 24, 24))
-        ws["A4"] = "Belum dikonfigurasi"
-        ws.freeze_panes = "A4"
+    _sheet_header(fund_sheet, fund_sheet.title, "Simulasi — alokasi dilaporkan pengguna; bukan saldo bank terverifikasi",
+                  (23, 26, 17, 22, 16, 20, 22))
+    if fund is None:
+        fund_sheet["A4"] = "Belum dikonfigurasi"
+        fund_sheet.freeze_panes = "A4"
+    else:
+        _tabular_rows(fund_sheet, FUND_HEADER, [fund], (1, 2, 4, 7), filter_rows=False)
+        fund_sheet["E5"].number_format = "0.00%"
+        fund_sheet["F5"].number_format = "0.00"
+        if any(value is None for value in fund):
+            fund_sheet["A7"] = "Belum dikonfigurasi lengkap; sel kosong berarti data belum tersedia."
+    _sheet_header(savings, savings.title, subtitle, (27, 26, 24, 24))
+    savings["A4"] = "Belum dikonfigurasi"
+    savings.freeze_panes = "A4"
     return wb
 
 
@@ -182,6 +196,33 @@ def _verify_budgets(ws: "Worksheet", expected: list[BudgetCells]) -> None:
             raise OSError("Nilai anggaran gagal diverifikasi.")
 
 
+def _fund_cells(fund: FundSummary) -> FundCells | None:
+    if fund.config_version is None and fund.balance_revision is None:
+        return None
+    progress = fund.progress_percent / 100 if fund.progress_percent is not None else None
+    return (fund.balance_rupiah, fund.essential_rupiah, fund.target_months, fund.target_rupiah,
+            progress, fund.coverage_months, fund.shortfall_rupiah)
+
+
+def _verify_fund(ws: "Worksheet", expected: FundCells | None) -> None:
+    if expected is None:
+        if ws['A4'].value != "Belum dikonfigurasi":
+            raise OSError("Status dana darurat kosong gagal diverifikasi.")
+        return
+    header, actual = ws.iter_rows(min_row=4, max_row=5, max_col=7, values_only=True)
+    if header != FUND_HEADER:
+        raise OSError("Kolom dana darurat gagal diverifikasi.")
+    for value, wanted in zip(actual, expected, strict=True):
+        if isinstance(wanted, float):
+            valid = isinstance(value, (int, float)) and not isinstance(value, bool) and isclose(value, wanted, rel_tol=1e-14)
+        elif wanted is None:
+            valid = value is None
+        else:
+            valid = type(value) is int and value == wanted
+        if not valid:
+            raise OSError("Nilai dana darurat gagal diverifikasi.")
+
+
 def export_report(db_path: Path, output: Path, *, ledger: str) -> int:
     """Export from an explicitly supplied, trusted fictional DB, never the default."""
     from openpyxl import load_workbook
@@ -191,18 +232,20 @@ def export_report(db_path: Path, output: Path, *, ledger: str) -> int:
     if output.resolve() == db_path.resolve():
         raise ValueError("Workbook tidak boleh menggantikan ledger.")
     reject_hardlinked_ledger(db_path)
-    rows, budget_rows = BudgetStore(db_path).reporting_snapshot()
+    with BudgetStore(db_path).reporting_connection() as (conn, rows, budget_rows):
+        fund = _fund_cells(read_fund_summary(conn))
     budgets = [_budget_cells(row) for row in budget_rows]
     totals, months = summarize(rows)
     if (totals[0] > MAX_EXCEL_INTEGER or totals[1] > MAX_EXCEL_INTEGER
             or any(version > MAX_EXCEL_INTEGER for _, version in rows)
-            or any(row.amount_rupiah > MAX_EXCEL_INTEGER for row in budget_rows)):
+            or any(row.amount_rupiah > MAX_EXCEL_INTEGER for row in budget_rows)
+            or any(type(value) is int and value > MAX_EXCEL_INTEGER for value in fund or ())):
         raise ValueError("Nilai Rupiah atau versi melebihi batas presisi 15 digit Excel.")
     if max(len(rows), len(budgets)) > 1_048_572:  # Four rows precede the details.
         raise ValueError("Jumlah transaksi atau anggaran melebihi kapasitas worksheet Excel.")
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    with closing(_workbook(rows, ledger, totals, months, budgets)) as wb:
+    with closing(_workbook(rows, ledger, totals, months, budgets, fund)) as wb:
         with NamedTemporaryFile(prefix=".laporan-", suffix=".xlsx", dir=output.parent, delete=False) as handle:
             temp = Path(handle.name)
         try:
@@ -217,6 +260,7 @@ def export_report(db_path: Path, output: Path, *, ledger: str) -> int:
                 if actual != totals:
                     raise OSError("Total workbook gagal diverifikasi.")
                 _verify_budgets(saved["Anggaran"], budgets)
+                _verify_fund(saved["Dana Darurat"], fund)
             os.replace(temp, output)
         finally:
             temp.unlink(missing_ok=True)

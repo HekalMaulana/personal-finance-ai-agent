@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Never
 
 from finance_budgets import BudgetExists, BudgetNotFound, BudgetStore
+from finance_emergency import EmergencyFundStore, InsufficientFund
 from finance_storage import (
     IdempotencyConflict, StaleVersion, TransactionNotFound, TransactionStore, reject_hardlinked_ledger,
 )
@@ -30,8 +31,16 @@ _BUDGET_FIELDS = {
     "budget-history": (_BUDGET_KEY, set()),
     "budget-summary": ({"period"}, {"category", "above_warning"}),
 }
+_EMERGENCY_FIELDS = {
+    "emergency-configure": ({"idempotency_key"}, {"essential_rupiah", "target_months", "expected_version", "confirmed", "reason"}),
+    "emergency-opening": ({"amount_rupiah", "idempotency_key"}, {"expected_revision", "confirmed", "reason"}),
+    "emergency-move": ({"direction", "amount_rupiah", "idempotency_key"}, {"description"}),
+    "emergency-summary": (set(), {"monthly_contribution_rupiah"}),
+    "emergency-history": (set(), set()),
+}
 _FIELDS = {
     **_BUDGET_FIELDS,
+    **_EMERGENCY_FIELDS,
     "add": ({"transaction_type", "amount_rupiah", "category", "occurred_at", "idempotency_key"}, {"description"}),
     "prepare-add": ({"transaction_type", "amount_rupiah", "category", "occurred_at", "idempotency_key"}, {"description"}),
     "commit-add": ({"operation_id"}, set()),
@@ -116,6 +125,21 @@ def _budget_request(path: Path, operation: str, payload: dict[str, Any]) -> Any:
     return [asdict(row) for row in store.budget_summary(**payload)]
 
 
+def _emergency_request(path: Path, operation: str, payload: dict[str, Any]) -> Any:
+    store = EmergencyFundStore(path)
+    if operation == "emergency-configure":
+        return asdict(store.configure(**payload))
+    if operation == "emergency-opening":
+        return asdict(store.set_opening(**payload))
+    if operation == "emergency-move":
+        return asdict(store.move(**payload))
+    if operation == "emergency-summary":
+        return asdict(store.summary(**payload))
+    configurations, movements = store.history()
+    return {"configurations": [asdict(row) for row in configurations],
+            "movements": [asdict(row) for row in movements]}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _Parser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--ledger", required=True, help="nama ledger fiktif di data/finance-cli/")
@@ -132,6 +156,8 @@ def main(argv: list[str] | None = None) -> int:
             return _emit(4, code="database_not_found", message="Ledger belum ada.")
         if args.operation in _BUDGET_FIELDS:
             return _emit(0, operation=args.operation, data=_budget_request(path, args.operation, payload))
+        if args.operation in _EMERGENCY_FIELDS:
+            return _emit(0, operation=args.operation, data=_emergency_request(path, args.operation, payload))
         store = TransactionStore(path, read_only=not writing, defer_init=writing)
         if args.operation == "add":
             data: Any = asdict(store.add_transaction(**payload))
@@ -169,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
         return _emit(3, code="idempotency_conflict", message=str(exc))
     except StaleVersion as exc:
         return _emit(6, code="stale_version", message=str(exc))
+    except InsufficientFund as exc:
+        return _emit(9, code="insufficient_fund", message=str(exc))
     except BudgetExists as exc:
         return _emit(8, code="budget_exists", message=str(exc))
     except BudgetNotFound as exc:

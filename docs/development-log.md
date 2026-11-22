@@ -56,3 +56,8 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 - Menambahkan anggaran bulanan berversi pada ledger fiktif yang sudah ada. Identitas periode/kategori unik; tidak ada upsert diam-diam atau hapus. Pembaruan memerlukan konfirmasi dan versi, dengan audit append-only dan retry idempoten.
 - Realisasi diturunkan setiap kali dibaca dari expense efektif per bulan Pontianak; Excel mendapat pagu dan transaksi dari snapshot yang sama, tetap hanya melalui ekspor eksplisit.
 - Suite 56/56 lulus. Uji Hermes tiga giliran dan verifikasi SQLite independen membuktikan realisasi Rp400.000 → Rp175.000, tidak ada revisi pagu sebelum konfirmasi, dan satu revisi setelahnya. Uji CLI membuka ulang worksheet Anggaran dengan nilai yang benar. Lihat [evaluasi dan batas bukti](evaluation.md#lesson-5a--anggaran-bulanan).
+
+## Lesson 5B — Emergency Fund Management
+
+- Menambah konfigurasi berversi dan riwayat alokasi terpisah dari ledger pemasukan/pengeluaran. Saldo awal eksplisit; koreksi saldo awal menambah selisih yang disetujui tanpa mengubah riwayat. Tidak ada edit setoran/penarikan, saldo negatif, atau pembacaan bank.
+- Menghubungkan skill Hermes dan sheet Dana Darurat tanpa ekspor otomatis. Suite 66/66 lulus; dua sesi Hermes terisolasi membuktikan pencatatan dan pembacaan ulang lintas sesi, dengan verifikasi SQLite terpisah. Lihat [evaluasi Lesson 5B](evaluation.md#lesson-5b--dana-darurat).

@@ -248,10 +248,16 @@ class BudgetStore:
 
     def reporting_snapshot(self) -> tuple[list[tuple[Transaction, int]], list[BudgetSummary]]:
         """Fetch effective detail and budgets from the same read-only SQLite snapshot."""
+        with self.reporting_connection() as (_, rows, budgets):
+            return rows, budgets
+
+    @contextmanager
+    def reporting_connection(self) -> Iterator[tuple[sqlite3.Connection, list[tuple[Transaction, int]], list[BudgetSummary]]]:
+        """Allow the exporter to read additional planning metrics in the same snapshot."""
         with self._connection() as conn:
             rows = [(Transaction(**{key: row[key] for key in row.keys() if key != 'version'}), row['version'])
                     for row in conn.execute('SELECT * FROM (' + _effective_sql(conn) + ') ORDER BY occurred_at, id')]
-            return rows, self._summarize(conn, None, None, False, [row for row, _ in rows])
+            yield conn, rows, self._summarize(conn, None, None, False, [row for row, _ in rows])
 
     @staticmethod
     def _summarize(conn: sqlite3.Connection, period: str | None, key: str | None,

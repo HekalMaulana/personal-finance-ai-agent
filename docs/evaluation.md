@@ -192,3 +192,18 @@ Hermes CLI v0.23.3, `openai/gpt-6.2-sol`, tiga giliran di satu sesi pada salinan
 3. Sesudah konfirmasi terpisah, Hermes menjalankan update dan membaca kembali versi 1. SQLite baca-saja menemukan dua versi pagu, audit Rp1.000.000 → Rp900.000 dengan alasan, realisasi efektif Rp175.000, dan tidak ada pelanggaran foreign key. Workbook masih belum ada. Ekspor eksplisit via CLI kemudian menghasilkan baris `2026-11`, Makanan, Rp900.000, Rp175.000, Rp725.000, 19,44% (tampilan), `normal`. Pembaca XLSX independen memeriksa nilainya dan SHA-256 SQLite identik sebelum/sesudah ekspor.
 
 Batas bukti: satu sesi percakapan; ekspor akhir diuji lewat CLI, bukan percakapan atau rendering Excel. Belum ada uji beban atau audit terhadap manipulasi file SQLite langsung.
+
+## Lesson 5B — Dana darurat
+
+Semua data fiktif, ledger pada direktori sementara; database utama tidak dibuka. Baseline 56/56. `py -3.12 -B -m unittest discover -s tests -q`: 66/66 (56 regresi, dua unit perhitungan dan delapan uji integrasi/API baru). `mypy --ignore-missing-imports` memeriksa kelima modul sumber.
+
+| Lapisan | Expected → aktual |
+| --- | --- |
+| Unit | Data yang belum diisi tidak berubah menjadi nol. ETA menggunakan pembulatan ke atas; setoran rutin nol tidak menghasilkan ETA bila target belum tercapai; target tercapai memberi ETA nol. Semua sesuai. |
+| CLI / SQLite | Esensial Rp5.000.000 × 3, saldo awal Rp6.000.000 + setoran Rp1.000.000 → hasil yang diharapkan dan aktual: saldo Rp7.000.000, target Rp15.000.000, cakupan 1,4 bulan, progres 46,67% (tampilan), kekurangan Rp8.000.000. Dengan setoran rutin Rp3.000.000, ETA tiga bulan. |
+| CLI / API | Retry saldo awal, setoran dan penarikan mengembalikan baris yang sama tanpa duplikat. Riwayat mengembalikan payload asal yang dapat dipakai lintas proses; uji revisi target saja membuktikan field esensial yang diwarisi tidak ditambahkan ke payload retry. Konflik key, saldo negatif, dan input tidak valid ditolak. Uji dua penarikan bersamaan hanya menerima satu. Penggantian konfigurasi dan saldo awal memerlukan konfirmasi; revisi saldo stale ditolak dan penyesuaian yang mengakibatkan saldo negatif tidak dicatat. |
+| XLSX | Belum ada file sebelum ekspor; jika sudah ada, byte dan mtime tidak berubah sesudah configure/opening/move/summary. Ekspor eksplisit memverifikasi ulang data, sumber SQLite tetap identik. Sheet Dana Darurat: placeholder saat kosong, lalu baris `7000000, 5000000, 3, 15000000, 0.466666…, 1.4, 8000000` dengan format progres `0.00%`. |
+
+### Percakapan Hermes
+
+Hermes CLI v0.23.3, dua sesi berbeda tanpa resume, dengan pembacaan langsung file skill dari salinan proyek dan transport PTY Windows. Ini bukan uji discovery otomatis. Sesi pertama menulis konfigurasi, saldo awal, dan setoran lalu membaca ulang ringkasan. Sesi baru hanya diberi ledger, key setoran, dan asumsi setoran bulanan Rp1.000.000. Hermes menemukan `e2e-deposit` revisi 1, cakupan 1,4 bulan, dan ETA 8 bulan tanpa menulis. Koneksi SQLite independen mode baca-saja menemukan konfigurasi versi 0, tepat dua mutasi (opening Rp6.000.000 dan deposit Rp1.000.000), saldo Rp7.000.000, dan 0 transaksi umum. Workbook belum ada selama kedua sesi. Konfirmasi penggantian, retry, dan ekspor dibuktikan di lapisan CLI/API, bukan percakapan; Excel tidak diuji secara visual.

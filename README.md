@@ -22,6 +22,7 @@ Skill `personal-finance-analysis` tetap untuk analisis tanpa pencatatan. Skill [
 | Tersedia untuk ledger fiktif | Koreksi transaksi dengan riwayat append-only dan perlindungan versi lama. Gunakan `get` dengan `include_version: true`, lalu `correct` atau `history`. |
 | Tersedia, teruji lewat CLI | Ekspor Excel atas permintaan eksplisit dari ledger fiktif; lihat [pengujian Lesson 4](docs/evaluation.md#lesson-4--excel-reporting-on-demand). |
 | Tersedia untuk ledger fiktif | Anggaran bulanan dan realisasi efektif dari SQLite; pembaruan memakai konfirmasi dan audit versi. Lihat [evaluasi Lesson 5A](docs/evaluation.md#lesson-5a--anggaran-bulanan). |
+| Tersedia untuk ledger fiktif | Dana darurat dengan saldo awal eksplisit, mutasi terpisah, audit konfigurasi, dan proyeksi dari setoran rutin yang diberikan. Lihat [evaluasi Lesson 5B](docs/evaluation.md#lesson-5b--dana-darurat). |
 | Direncanakan, belum aktif | Penggunaan database utama dari percakapan, tinjauan mingguan, evaluasi dana darurat triwulanan, dan pengecekan jadwal terlewat. |
 
 ## Mencoba prototipe
@@ -65,7 +66,7 @@ CLI Windows (tidak perlu JSON stdin):
 py -3.12 -B finance_reporting.py --ledger lesson3-demo export
 ```
 
-Gunakan Python 3.12+ dengan `openpyxl` (`requirements-reporting.txt`). Python Windows 3.12 yang diperiksa sudah memiliki 3.1.5; `python3` bawaan Hermes yang diperiksa belum memilikinya. Siapkan dependensi hanya dengan persetujuan. Workbook `reports/laporan-keuangan.xlsx` adalah keluaran lokal yang diabaikan Git. Sheet Dashboard, Transaksi, dan Bulanan berasal dari versi transaksi efektif; Anggaran menampilkan pagu dan realisasi efektif untuk semua periode yang dikonfigurasi, atau “Belum dikonfigurasi” bila tidak ada pagu. Dana Darurat dan Target Tabungan tetap belum dikonfigurasi. Pembaruan mengganti seluruh workbook, termasuk edit manual. Tutup file di Excel jika terkunci.
+Gunakan Python 3.12+ dengan `openpyxl` (`requirements-reporting.txt`). Python Windows 3.12 yang diperiksa sudah memiliki 3.1.5; `python3` bawaan Hermes yang diperiksa belum memilikinya. Siapkan dependensi hanya dengan persetujuan. Workbook `reports/laporan-keuangan.xlsx` adalah keluaran lokal yang diabaikan Git. Sheet Dashboard, Transaksi, dan Bulanan berasal dari versi transaksi efektif; Anggaran menampilkan pagu dan realisasi efektif untuk semua periode yang dikonfigurasi, atau “Belum dikonfigurasi” bila tidak ada pagu. Dana Darurat menampilkan saldo alokasi yang dilaporkan pengguna dan metrik target bila tersedia; Target Tabungan tetap belum dikonfigurasi. Pembaruan mengganti seluruh workbook, termasuk edit manual. Tutup file di Excel jika terkunci.
 
 Uji lengkap pada Windows: `py -3.12 -B -m unittest discover -s tests -v`.
 
@@ -83,6 +84,20 @@ CLI menggunakan `finance_cli.py --ledger NAMA OPERASI` dengan satu objek JSON di
 | `budget-summary` | `period`; opsional `category` dan `above_warning` (boolean; `true` berarti **lebih dari** 90%) |
 
 Contoh JSON ringkasan: `{"period":"2026-11","category":"Makanan"}`. Nama kategori yang hanya berbeda kapitalisasi atau spasi berulang/tepi dihitung bersama. Sisa bisa negatif; status mendekati batas mulai 90% sampai 100% inklusif, dan melebihi batas setelah 100%. Tidak ada anggaran yang dibuat otomatis untuk kategori tanpa pagu.
+
+### Mengelola dana darurat fiktif
+
+Di Hermes, pilih ledger fiktif yang sudah ada. Contoh: “Untuk ledger fiktif lesson3-demo, tetapkan kebutuhan esensial Rp5.000.000 dan target 3 bulan.” Lalu: “Tetapkan saldo awal Rp6.000.000”, “Catat setoran Rp1.000.000”, dan “Berapa cakupan dana darurat jika setoran rutin saya Rp1.000.000 per bulan?” Skill [finance-emergency](.hermes/skills/finance-emergency/SKILL.md) meminta konfirmasi sebelum mengganti nilai tersimpan dan tidak mengekspor otomatis.
+
+| Operasi `finance_cli.py --ledger NAMA` | Objek JSON di stdin |
+| --- | --- |
+| `emergency-configure` | `idempotency_key`, satu atau kedua `essential_rupiah`, `target_months`; `expected_version` jika sudah ada konfigurasi; `confirmed:true` dan `reason` untuk mengganti nilai yang sudah ada |
+| `emergency-opening` | `amount_rupiah` (boleh nol), `idempotency_key`; `expected_revision`, `confirmed:true`, `reason` untuk memperbaiki saldo awal |
+| `emergency-move` | `direction` (`deposit`/`withdrawal`), `amount_rupiah` positif, `idempotency_key`, opsional `description` |
+| `emergency-summary` | `{}` atau `monthly_contribution_rupiah` untuk estimasi, tanpa menyimpan asumsi |
+| `emergency-history` | `{}` membaca semua revisi konfigurasi dan mutasi beserta `request` asal ternormalisasi |
+
+Saldo ini alokasi yang dilaporkan pengguna, bukan saldo bank. Pemindahan alokasi tidak ditulis sebagai pemasukan, pengeluaran, atau tabungan lain. Siapkan saldo awal eksplisit sebelum mencatat mutasi, termasuk jika saldonya Rp0.
 
 ## Dokumentasi pengembangan
 
