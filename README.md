@@ -8,7 +8,7 @@ An Indonesian-language Hermes Agent prototype for tracking fictional transaction
 | --- | --- |
 | Implemented | Transactions, filters and summaries, versioned corrections, recovery after interrupted writes, monthly budgets, emergency funds, savings goals, on-demand Excel export, and a scheduled analysis engine with manual CLI startup and an opt-in Hermes cron installer. The analysis skill can work without saving data. |
 | Tested | Deterministic Python, SQLite, and Excel tests on Windows and Ubuntu under WSL. See [evaluation](docs/evaluation.md) for separate evidence from earlier Hermes conversation tests. |
-| Planned | Real VPS validation, Telegram integration, reminders. |
+| Planned | Live Telegram acceptance, real VPS validation, reminders. |
 
 ## Technology Stack
 
@@ -119,7 +119,7 @@ The [VPS guide](docs/deployment/vps.md) includes the fresh-clone checklist, opti
 
 ## Telegram Integration
 
-**Planned.** This repository does not configure or test a Telegram finance bot. Upstream Hermes gateway support does not verify this project's workspace, confirmations, or file handling over Telegram.
+**Lesson 7A — offline-verified setup for fictional data.** The [Telegram deployment guide](docs/deployment/telegram.md) uses Hermes's built-in gateway with a dedicated profile and owner-only DMs. The baseline can discover project skills and discuss fictional scenarios; the Telegram toolset does not include the terminal needed to invoke the finance CLI. Use the local CLI for ledger operations. The disposable smoke test needs no bot token, network, model call, gateway process, or persistent service. Live Telegram delivery and production isolation are not verified.
 
 ## Testing
 

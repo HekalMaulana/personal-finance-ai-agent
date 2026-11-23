@@ -36,6 +36,11 @@
 ## Cron Hermes opsional — Lesson 6B
 - `finance_cron.py` hanya untuk ledger fiktif dan profil privat. Dry-run tidak mengubah state; instalasi eksplisit membuat job paused. Aktivasi terpisah memerlukan `resume --confirm`. Gunakan `--no-agent` dan delivery lokal; jangan aktifkan job, gateway, atau service dalam pengujian pengembangan.
 
+## Gateway Telegram opsional — Lesson 7A
+- Telegram hanya untuk uji fiktif melalui DM pemilik. Allowlist identitas bukan otorisasi perubahan data. Jangan kirim data, file laporan, atau hasil analisis ke grup/kanal dan jangan aktifkan pengiriman terjadwal.
+- Profil Telegram baseline hanya boleh membaca skill dan melakukan simulasi tanpa akses ledger. Tolak permintaan mengubah SQLite melalui Telegram; arahkan pemilik ke CLI lokal. Jangan menyiapkan transaksi, menjalankan analisis terjadwal, atau mencoba SQL/akses file langsung dari Telegram.
+- Untuk perubahan lokal yang diminta lewat percakapan, tampilkan pratinjau ledger, operasi, nilai lama dan baru bila relevan, serta versi dan alasan yang diwajibkan skill. Tunggu jawaban eksplisit atas pratinjau sebelum memanggil operasi yang menulis, termasuk `prepare-add`; ikuti validasi, versi dan idempotensi CLI. Jangan terima persetujuan ambigu, kutipan, atau persetujuan lama setelah payload/sesi berubah. Jika hasil tidak pasti, baca status/riwayat sebelum retry.
+
 ## Rencana kemampuan — belum diaktifkan
 - Penggunaan pencatatan percakapan di luar ledger uji fiktif.
 - Pengingat target tabungan.
@@ -46,7 +51,7 @@
 - Jangan memasang skill, MCP, atau dependensi tanpa persetujuan pengguna.
 - Jangan mengubah konfigurasi global Hermes.
 - Jangan mengakses atau mengubah proyek OpenCode lama.
-- Gunakan hanya basis data uji fiktif yang diotorisasi, termasuk saat menyiapkan deployment. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
+- Gunakan hanya basis data uji fiktif yang diotorisasi, termasuk saat menyiapkan deployment. Lesson 7A mengizinkan konfigurasi dan smoke test offline saja di lingkungan pengembangan. Jangan aktifkan gateway, bot produksi, cron delivery, atau service persisten di laptop pengembang. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
 
 ## Efficient Development Workflow
 - Baca hanya file dan bagian yang relevan. Hindari pembacaan ulang kecuali file berubah atau ada informasi yang belum cukup.
