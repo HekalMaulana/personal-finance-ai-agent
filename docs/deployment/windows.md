@@ -18,3 +18,7 @@ Target: native Windows 11 and PowerShell. You do not need WSL for this setup. Th
 4. Review [running Hermes](../../README.md#running-hermes-agent) to trust the project and start a session. Use the local terminal backend on the same machine as the clone. The skills select `.venv\Scripts\python.exe` directly, even if Hermes itself uses a different Python.
 
 If `py` or `hermes` is not found after installation, open a new PowerShell window and check the PATH entries documented by its installer. If an export fails with the workbook open in Excel, close the workbook before retrying.
+
+## Optional scheduled analysis
+
+See the [cron deployment guide](cron.md). Use the native Hermes `.exe`, an absolute `HERMES_HOME` for the intended profile, and `.\.venv\Scripts\python.exe`. If a wrapper fails, point `FINANCE_HERMES_EXECUTABLE` at a working Hermes `.exe`. Start with dry-run; if no ticker is available, use the documented direct runner. The Windows smoke test used a temporary, paused job and did not start a gateway.

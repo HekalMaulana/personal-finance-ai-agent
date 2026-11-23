@@ -27,6 +27,8 @@ Start tmux with `tmux new -s finance`. Detach with Ctrl+B then D, and reconnect 
 
 If a later, validated deployment needs boot-time startup, evaluate the [Hermes gateway service](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/) under the same unprivileged account. Configure the service's environment and terminal working directory explicitly, and test start, restart, shutdown, and logs before enabling it at boot. Do not expose a dashboard or gateway port for this interactive SSH setup. Telegram remains planned.
 
+For optional analysis without an LLM, see the [cron deployment guide](cron.md). Keep the existing UTC server clock; the pinned `Asia/Pontianak` zone schedules 09:00 WIB (02:00 UTC). Use the same private profile as the ticker. The installer stages a paused job, not a service. Without an existing ticker, use the tested direct runner; real VPS operation remains unverified.
+
 ## Update through Git
 
 Stop Hermes and any other CLI writers, take a backup, then use `git status --short` and `git pull --ff-only` from the clean checkout. Review changed skills before restarting. Refresh the venv with `./.venv/bin/python -m pip install -r requirements-reporting.txt` if requirements changed. Run the offline tests, then restart with the same workspace and environment. Avoid `git clean -fdx`; it can delete ignored runtime state. Upgrade Hermes separately using its upstream instructions.

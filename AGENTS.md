@@ -33,9 +33,12 @@
 - Jalankan `finance_analysis.py` hanya pada ledger fiktif yang sudah ada dan disepakati. `check-due`, `status`, dan `history` tidak menulis; `run-due` menjalankan catch-up dan hanya menulis jurnal analisis. Jangan jalankan pekerjaan atau retry dari percakapan tanpa permintaan eksplisit.
 - Jangan menyamakan arus kas dengan saldo bank atau snapshot dana darurat saat eksekusi dengan saldo pada tanggal jatuh tempo. Tidak ada ekspor otomatis.
 
+## Cron Hermes opsional — Lesson 6B
+- `finance_cron.py` hanya untuk ledger fiktif dan profil privat. Dry-run tidak mengubah state; instalasi eksplisit membuat job paused. Aktivasi terpisah memerlukan `resume --confirm`. Gunakan `--no-agent` dan delivery lokal; jangan aktifkan job, gateway, atau service dalam pengujian pengembangan.
+
 ## Rencana kemampuan — belum diaktifkan
 - Penggunaan pencatatan percakapan di luar ledger uji fiktif.
-- Pemicu otomatis untuk analisis terjadwal dan pengingat target tabungan.
+- Pengingat target tabungan.
 
 ## Batasan keamanan — berlaku sekarang
 - Gunakan hanya data fiktif. Jangan mengakses data keuangan asli.

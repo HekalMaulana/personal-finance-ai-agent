@@ -24,3 +24,7 @@ Target: Ubuntu 24.04 LTS. The CLI and Excel workflows were tested under Ubuntu 2
    If venv creation reports that `ensurepip` is missing, install the matching Python venv package. Do not install packages into the system interpreter to work around it.
 3. Install the Linux CLI using the [official Hermes installation guide](https://hermes-agent.nousresearch.com/docs/getting-started/installation#without-hermes-desktop). Open a fresh shell, return to the clone, then run `hermes --version`, `hermes setup model`, and `hermes doctor`. Choose your own provider and tool-capable model. If Hermes is not on PATH, check the launcher path in the installation guide.
 4. Follow [running Hermes](../../README.md#running-hermes-agent) to review the skills, trust the checkout, and chat. Use the local terminal backend with the repository on the same host. The skills call `./.venv/bin/python`; no activation is required.
+
+## Optional scheduled analysis
+
+Follow the [cron deployment guide](cron.md) after cloning. The explicit `Asia/Pontianak` job timezone works independently of an Ubuntu host's UTC timezone on compatible Hermes builds. The direct runner was tested on Ubuntu WSL; Hermes was not installed there. If the gateway or required flags are unavailable, use the manual fallback.

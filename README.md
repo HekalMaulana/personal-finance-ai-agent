@@ -6,9 +6,9 @@ An Indonesian-language Hermes Agent prototype for tracking fictional transaction
 
 | Status | Scope |
 | --- | --- |
-| Implemented | Transactions, filters and summaries, versioned corrections, recovery after interrupted writes, monthly budgets, emergency funds, savings goals, on-demand Excel export, and a scheduled analysis engine with manual CLI startup. The analysis skill can work without saving data. |
+| Implemented | Transactions, filters and summaries, versioned corrections, recovery after interrupted writes, monthly budgets, emergency funds, savings goals, on-demand Excel export, and a scheduled analysis engine with manual CLI startup and an opt-in Hermes cron installer. The analysis skill can work without saving data. |
 | Tested | Deterministic Python, SQLite, and Excel tests on Windows and Ubuntu under WSL. See [evaluation](docs/evaluation.md) for separate evidence from earlier Hermes conversation tests. |
-| Planned | Real VPS validation, Telegram integration, automatic schedule triggers, and reminders. |
+| Planned | Real VPS validation, Telegram integration, reminders. |
 
 ## Technology Stack
 
@@ -100,7 +100,11 @@ Replace the sample period with an ID returned by `run-due` or `history`: `weekly
 - Mondays 09:00 Asia/Pontianak: prior calendar week, Monday 00:00 through the next Monday 00:00 exclusive. Weekly spending uses effective transactions and is compared with the effective monthly budget for each month the week touches. Cash flow is not bank balance.
 - January 1, April 1, July 1, October 1 at 09:00 Asia/Pontianak: emergency fund balance, target, coverage, progress, and shortfall. Catch-up reports the allocation observed when the job actually ran, not a historical or bank balance.
 
-`run-due` writes only its SQLite journal. No Excel export, model call, Hermes cron, gateway, or Telegram is enabled.
+`run-due` writes only its SQLite journal. It never exports Excel or calls a model.
+
+## Optional Hermes cron (Lesson 6B)
+
+The [cron deployment guide](docs/deployment/cron.md) covers dry-run, installation, activation, pause, removal, and the manual fallback. `finance_cron.py` installs one paused job per Hermes profile. After explicit activation, the job invokes `finance_cron_runner.py` daily at 09:00 Asia/Pontianak (02:00 UTC), with `--no-agent` and local delivery only. No gateway or service is installed or started by this project. The runner can also be used directly without Hermes.
 
 ## Data Storage & Privacy
 
