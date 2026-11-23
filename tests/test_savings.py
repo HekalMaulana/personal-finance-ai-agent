@@ -134,6 +134,18 @@ class SavingsTests(unittest.TestCase):
         self.assertEqual([row['kind'] for row in self.cli('savings-history', dict(id=goal['id']))],
                          ['create', 'opening', 'deposit', 'update', 'opening_adjustment'])
 
+    def test_target_update_requires_explicit_due_date(self):
+        goal = self.create(due_date='2028-02-29')
+        change = dict(id=goal['id'], name='Laptop Baru', target_rupiah=10_000_000)
+        preview = self.cli('savings-preview', change | dict(due_date=goal['due_date']))
+        self.assertEqual(self.cli('savings-preview', change, 2), 'invalid_input')
+        write = change | dict(expected_revision=preview['before']['revision'], confirmed=True,
+                              reason='Uji nama', idempotency_key='rename')
+        self.assertEqual(self.cli('savings-update', write, 2), 'invalid_input')
+        self.assertEqual(self.cli('savings-history', dict(id=goal['id'])), [goal])
+        updated = self.cli('savings-update', write | preview['changes'])
+        self.assertEqual((updated['name'], updated['due_date']), ('Laptop Baru', '2028-02-29'))
+
     def test_withdrawal_retries_conflicts_and_no_partial_changes(self):
         goal = self.create()
         other = self.create(idempotency_key='other')

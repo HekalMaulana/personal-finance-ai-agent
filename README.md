@@ -108,7 +108,7 @@ Gunakan [skill `finance-savings`](.hermes/skills/finance-savings/SKILL.md) pada 
 | `savings-create` | `name`, `target_rupiah` (integer positif), `idempotency_key`, opsional `due_date` (`YYYY-MM-DD`) |
 | `savings-list` | `{}` |
 | `savings-get`, `savings-history` | `id` UUID; `savings-get` juga menerima `monthly_contribution_rupiah` opsional |
-| `savings-preview` | `id` + `amount_rupiah` untuk saldo awal, atau `id`, `name`, `target_rupiah`, `due_date` untuk revisi target. Salin tenggat efektif bila tidak diubah; `null` menghapus tenggat. |
+| `savings-preview` | `id` + `amount_rupiah` untuk saldo awal, atau `id`, `name`, `target_rupiah`, `due_date` untuk revisi target. `due_date` wajib untuk revisi: salin tenggat efektif jika tidak diubah, atau kirim `null` secara eksplisit untuk menghapus tenggat. |
 | `savings-opening`, `savings-update` | Objek `changes` dari pratinjau ditambah `confirmed:true`, `reason`, `idempotency_key` |
 | `savings-move` | `id`, `direction` (`deposit`/`withdrawal`), `amount_rupiah` (integer positif), `idempotency_key`, opsional `description` |
 

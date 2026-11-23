@@ -210,7 +210,7 @@ Hermes CLI v0.23.3, dua sesi berbeda tanpa resume, dengan pembacaan langsung fil
 
 ## Lesson 5C — Target tabungan
 
-Semua fixture fiktif dan terisolasi; database utama tidak digunakan. `py -3.12 -B -m unittest discover -s tests -q`: 72/72 lulus (66 regresi, 6 uji Lesson 5C). Pemeriksaan `mypy --ignore-missing-imports finance_*.py` lulus pada enam modul.
+Semua fixture fiktif dan terisolasi; database utama tidak digunakan. `py -3.12 -B -m unittest discover -s tests -q`: 73/73 lulus (66 regresi, 7 uji Lesson 5C), termasuk penolakan revisi target tanpa `due_date` untuk mencegah tenggat hilang tanpa sengaja. Pemeriksaan `mypy --ignore-missing-imports finance_*.py` lulus pada enam modul.
 
 | Lapisan | Expected → aktual |
 | --- | --- |

@@ -151,11 +151,11 @@ class SavingsStore:
         if fields.keys() == {'amount_rupiah'}:
             operation = 'opening'
             request = dict(amount_rupiah=_nonnegative(fields['amount_rupiah'], 'Saldo awal'))
-        elif {'name', 'target_rupiah'} <= fields.keys() <= {'name', 'target_rupiah', 'due_date'}:
+        elif fields.keys() == {'name', 'target_rupiah', 'due_date'}:
             operation = 'update'
-            request = _goal_fields(fields['name'], fields['target_rupiah'], fields.get('due_date'))
+            request = _goal_fields(fields['name'], fields['target_rupiah'], fields['due_date'])
         else:
-            raise ValueError('Pratinjau memerlukan amount_rupiah atau nama dan nominal target lengkap.')
+            raise ValueError('Pratinjau memerlukan amount_rupiah atau name, target_rupiah, dan due_date.')
         with self._ledger._connection() as conn:
             before = _latest(conn, goal_id)
             kind, after = _proposed(before, operation, request)
@@ -167,7 +167,7 @@ class SavingsStore:
         return self._write('create', idempotency_key, **_goal_fields(name, target_rupiah, due_date))
 
     def update(self, *, id: str, name: str, target_rupiah: int, expected_revision: int, confirmed: bool,
-               reason: str, idempotency_key: str, due_date: str | None = None) -> dict[str, Any]:
+               reason: str, idempotency_key: str, due_date: str | None) -> dict[str, Any]:
         return self._write('update', idempotency_key, id=_transaction_id(id),
                            **_goal_fields(name, target_rupiah, due_date),
                            **self._confirmation(expected_revision, confirmed, reason))

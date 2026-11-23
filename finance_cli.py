@@ -48,7 +48,7 @@ _SAVINGS_FIELDS = {
     "savings-get": (_SAVINGS_ID, {"monthly_contribution_rupiah"}),
     "savings-history": (_SAVINGS_ID, set()),
     "savings-preview": (_SAVINGS_ID, _SAVINGS_GOAL | {"due_date", "amount_rupiah"}),
-    "savings-update": (_SAVINGS_ID | _SAVINGS_GOAL | _SAVINGS_CONFIRM, {"due_date"}),
+    "savings-update": (_SAVINGS_ID | _SAVINGS_GOAL | _SAVINGS_CONFIRM | {"due_date"}, set()),
     "savings-opening": (_SAVINGS_ID | _SAVINGS_CONFIRM | {"amount_rupiah"}, set()),
     "savings-move": (_SAVINGS_ID | {"direction", "amount_rupiah", "idempotency_key"}, {"description"}),
 }
