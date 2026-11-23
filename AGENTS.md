@@ -26,11 +26,14 @@
 ## Dana darurat fiktif — Lesson 5B
 - Gunakan `finance-emergency` pada ledger fiktif yang sudah ada dan disepakati. Saldo adalah alokasi yang dilaporkan pengguna, bukan saldo bank. Jangan menggandakan mutasi sebagai transaksi umum. Tinjau dan konfirmasi penggantian konfigurasi atau saldo awal; verifikasi dari SQLite. Tidak ada ekspor otomatis.
 
+## Target tabungan fiktif — Lesson 5C
+- Gunakan `finance-savings` pada ledger fiktif yang sudah ada dan disepakati. Tinjau dan konfirmasi sebelum mencatat/mengoreksi saldo awal atau mengubah target. Verifikasi dari SQLite. Alokasi per target terpisah dari transaksi umum dan dana darurat; tidak ada transfer atau ekspor otomatis.
+
 ## Rencana kemampuan — belum diaktifkan
 - Penggunaan pencatatan percakapan di luar ledger uji fiktif.
 - Analisis keuangan setiap minggu.
 - Evaluasi kebutuhan dana darurat setiap tiga bulan.
-- Perencanaan tabungan untuk target pembelian barang.
+- Otomasi atau pengingat target tabungan.
 - Pemeriksaan jadwal yang terlewat saat laptop sebelumnya mati.
 
 ## Batasan keamanan — berlaku sekarang
@@ -39,7 +42,7 @@
 - Jangan memasang skill, MCP, atau dependensi tanpa persetujuan pengguna.
 - Jangan mengubah konfigurasi global Hermes.
 - Jangan mengakses atau mengubah proyek OpenCode lama.
-- Batas Lesson 3–5B: gunakan hanya basis data uji fiktif yang diotorisasi. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
+- Batas Lesson 3–5C: gunakan hanya basis data uji fiktif yang diotorisasi. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
 
 ## Efficient Development Workflow
 - Baca hanya file dan bagian yang relevan. Hindari pembacaan ulang kecuali file berubah atau ada informasi yang belum cukup.

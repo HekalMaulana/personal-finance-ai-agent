@@ -18,7 +18,7 @@ class BudgetIntegrationTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
         # Run real CLI entry points without allowing access to the actual workspace data.
-        for name in ('finance_cli.py', 'finance_storage.py', 'finance_budgets.py', 'finance_emergency.py', 'finance_reporting.py'):
+        for name in ('finance_cli.py', 'finance_storage.py', 'finance_budgets.py', 'finance_emergency.py', 'finance_savings.py', 'finance_reporting.py'):
             if (ROOT / name).is_file():
                 (self.root / name).write_bytes((ROOT / name).read_bytes())
         self.db = self.root / 'data' / 'finance-cli' / 'budget-test.db'

@@ -66,7 +66,7 @@ CLI Windows (tidak perlu JSON stdin):
 py -3.12 -B finance_reporting.py --ledger lesson3-demo export
 ```
 
-Gunakan Python 3.12+ dengan `openpyxl` (`requirements-reporting.txt`). Python Windows 3.12 yang diperiksa sudah memiliki 3.1.5; `python3` bawaan Hermes yang diperiksa belum memilikinya. Siapkan dependensi hanya dengan persetujuan. Workbook `reports/laporan-keuangan.xlsx` adalah keluaran lokal yang diabaikan Git. Sheet Dashboard, Transaksi, dan Bulanan berasal dari versi transaksi efektif; Anggaran menampilkan pagu dan realisasi efektif untuk semua periode yang dikonfigurasi, atau “Belum dikonfigurasi” bila tidak ada pagu. Dana Darurat menampilkan saldo alokasi yang dilaporkan pengguna dan metrik target bila tersedia; Target Tabungan tetap belum dikonfigurasi. Pembaruan mengganti seluruh workbook, termasuk edit manual. Tutup file di Excel jika terkunci.
+Gunakan Python 3.12+ dengan `openpyxl` (`requirements-reporting.txt`). Python Windows 3.12 yang diperiksa sudah memiliki 3.1.5; `python3` bawaan Hermes yang diperiksa belum memilikinya. Siapkan dependensi hanya dengan persetujuan. Workbook `reports/laporan-keuangan.xlsx` adalah keluaran lokal yang diabaikan Git. Sheet Dashboard, Transaksi, dan Bulanan berasal dari versi transaksi efektif; Anggaran menampilkan pagu dan realisasi efektif untuk semua periode yang dikonfigurasi, atau “Belum dikonfigurasi” bila tidak ada pagu. Dana Darurat menampilkan saldo alokasi yang dilaporkan pengguna dan metrik target bila tersedia; Target Tabungan menampilkan saldo per target, progres, kekurangan, dan tenggat opsional, atau “Belum dikonfigurasi” bila kosong. Pembaruan mengganti seluruh workbook, termasuk edit manual. Tutup file di Excel jika terkunci.
 
 Uji lengkap pada Windows: `py -3.12 -B -m unittest discover -s tests -v`.
 
@@ -98,6 +98,21 @@ Di Hermes, pilih ledger fiktif yang sudah ada. Contoh: “Untuk ledger fiktif le
 | `emergency-history` | `{}` membaca semua revisi konfigurasi dan mutasi beserta `request` asal ternormalisasi |
 
 Saldo ini alokasi yang dilaporkan pengguna, bukan saldo bank. Pemindahan alokasi tidak ditulis sebagai pemasukan, pengeluaran, atau tabungan lain. Siapkan saldo awal eksplisit sebelum mencatat mutasi, termasuk jika saldonya Rp0.
+
+### Mengelola target tabungan fiktif
+
+Gunakan [skill `finance-savings`](.hermes/skills/finance-savings/SKILL.md) pada ledger fiktif yang sudah ada. Misalnya: “Buat target Laptop Rp10.000.000 pada ledger fiktif lesson3-demo.” Untuk saldo awal Rp2.000.000, tinjau dan konfirmasi terlebih dahulu, lalu catat setoran Rp1.000.000. Estimasi memakai setoran rutin yang dinyatakan, tanpa menganggap surplus sebagai tabungan.
+
+| Operasi CLI | Objek JSON di stdin |
+| --- | --- |
+| `savings-create` | `name`, `target_rupiah` (integer positif), `idempotency_key`, opsional `due_date` (`YYYY-MM-DD`) |
+| `savings-list` | `{}` |
+| `savings-get`, `savings-history` | `id` UUID; `savings-get` juga menerima `monthly_contribution_rupiah` opsional |
+| `savings-preview` | `id` + `amount_rupiah` untuk saldo awal, atau `id`, `name`, `target_rupiah`, `due_date` untuk revisi target. Salin tenggat efektif bila tidak diubah; `null` menghapus tenggat. |
+| `savings-opening`, `savings-update` | Objek `changes` dari pratinjau ditambah `confirmed:true`, `reason`, `idempotency_key` |
+| `savings-move` | `id`, `direction` (`deposit`/`withdrawal`), `amount_rupiah` (integer positif), `idempotency_key`, opsional `description` |
+
+Saldo awal belum tersedia sebelum dikonfirmasi, berbeda dari Rp0. Setoran dan penarikan tidak memengaruhi transaksi umum atau dana darurat. Ekspor hanya atas permintaan. Lihat [evaluasi Lesson 5C](docs/evaluation.md#lesson-5c--target-tabungan).
 
 ## Dokumentasi pengembangan
 

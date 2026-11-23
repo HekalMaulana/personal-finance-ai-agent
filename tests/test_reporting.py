@@ -164,7 +164,7 @@ class ReportingIntegrationTests(unittest.TestCase):
     def test_cli_only_exports_on_explicit_operation(self):
         from shutil import copyfile
 
-        for name in ("finance_cli.py", "finance_storage.py", "finance_budgets.py", "finance_emergency.py", "finance_reporting.py"):
+        for name in ("finance_cli.py", "finance_storage.py", "finance_budgets.py", "finance_emergency.py", "finance_savings.py", "finance_reporting.py"):
             copyfile(ROOT / name, self.root / name)
 
         def cli(script, operation, payload=None, ledger="lesson4-fixture"):

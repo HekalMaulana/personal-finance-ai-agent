@@ -207,3 +207,15 @@ Semua data fiktif, ledger pada direktori sementara; database utama tidak dibuka.
 ### Percakapan Hermes
 
 Hermes CLI v0.23.3, dua sesi berbeda tanpa resume, dengan pembacaan langsung file skill dari salinan proyek dan transport PTY Windows. Ini bukan uji discovery otomatis. Sesi pertama menulis konfigurasi, saldo awal, dan setoran lalu membaca ulang ringkasan. Sesi baru hanya diberi ledger, key setoran, dan asumsi setoran bulanan Rp1.000.000. Hermes menemukan `e2e-deposit` revisi 1, cakupan 1,4 bulan, dan ETA 8 bulan tanpa menulis. Koneksi SQLite independen mode baca-saja menemukan konfigurasi versi 0, tepat dua mutasi (opening Rp6.000.000 dan deposit Rp1.000.000), saldo Rp7.000.000, dan 0 transaksi umum. Workbook belum ada selama kedua sesi. Konfirmasi penggantian, retry, dan ekspor dibuktikan di lapisan CLI/API, bukan percakapan; Excel tidak diuji secara visual.
+
+## Lesson 5C — Target tabungan
+
+Semua fixture fiktif dan terisolasi; database utama tidak digunakan. `py -3.12 -B -m unittest discover -s tests -q`: 72/72 lulus (66 regresi, 6 uji Lesson 5C). Pemeriksaan `mypy --ignore-missing-imports finance_*.py` lulus pada enam modul.
+
+| Lapisan | Expected → aktual |
+| --- | --- |
+| CLI lintas proses | Target Laptop Rp10.000.000, saldo awal Rp2.000.000, setoran Rp1.000.000 → saldo Rp3.000.000, progres 30%, kekurangan Rp7.000.000, dan ETA 7 bulan dengan kontribusi eksplisit Rp1.000.000/bulan. Tanpa asumsi tersebut, ETA belum tersedia. |
+| CLI / SQLite | Input salah, tenggat kalender tidak sah, konfirmasi tidak valid, revisi basi, konflik key dan overdraft ditolak. Retry bersamaan tidak menggandakan mutasi; hanya satu dari dua penarikan bersamaan berhasil. Dua target bernama sama tetap ber-ID dan bersaldo terpisah. Koreksi saldo awal mempertahankan setoran dan riwayat. |
+| XLSX | Tidak dibuat sebelum ekspor; ketika file sudah ada, byte dan mtime tidak berubah oleh operasi tabungan. Ekspor eksplisit membaca ulang dua target, saldo/tenggat opsional, persentase terformat dan nama mirip formula yang tetap teks. SQLite tidak berubah. Pemeriksaan isi, bukan visual. |
+
+Hermes CLI v0.23.3 pada salinan sementara: sesi pertama membuat Laptop dan menampilkan pratinjau tanpa mencatat saldo awal. Sesi yang dilanjutkan menerima konfirmasi, menetapkan Rp2.000.000, dan mencatat setoran Rp1.000.000. Sesi baru tanpa resume menemukan key setoran dan membaca Rp3.000.000, 30%, Rp7.000.000, dan 7 bulan dari CLI. Verifikasi SQLite baca-saja menemukan tepat tiga revisi, nol transaksi umum, dan tidak ada workbook. Penemuan otomatis skill tidak tersedia di salinan sementara; agen membaca file skill lokal. Penarikan, koreksi, retry, dan ekspor diuji lewat CLI/API, bukan lewat percakapan.

@@ -7,10 +7,11 @@ import sqlite3
 import sys
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Never
+from typing import Any, Callable, Never
 
 from finance_budgets import BudgetExists, BudgetNotFound, BudgetStore
 from finance_emergency import EmergencyFundStore, InsufficientFund
+from finance_savings import SavingsNotFound, SavingsStore
 from finance_storage import (
     IdempotencyConflict, StaleVersion, TransactionNotFound, TransactionStore, reject_hardlinked_ledger,
 )
@@ -38,7 +39,21 @@ _EMERGENCY_FIELDS = {
     "emergency-summary": (set(), {"monthly_contribution_rupiah"}),
     "emergency-history": (set(), set()),
 }
+_SAVINGS_ID = {"id"}
+_SAVINGS_GOAL = {"name", "target_rupiah"}
+_SAVINGS_CONFIRM = {"expected_revision", "confirmed", "reason", "idempotency_key"}
+_SAVINGS_FIELDS = {
+    "savings-create": (_SAVINGS_GOAL | {"idempotency_key"}, {"due_date"}),
+    "savings-list": (set(), set()),
+    "savings-get": (_SAVINGS_ID, {"monthly_contribution_rupiah"}),
+    "savings-history": (_SAVINGS_ID, set()),
+    "savings-preview": (_SAVINGS_ID, _SAVINGS_GOAL | {"due_date", "amount_rupiah"}),
+    "savings-update": (_SAVINGS_ID | _SAVINGS_GOAL | _SAVINGS_CONFIRM, {"due_date"}),
+    "savings-opening": (_SAVINGS_ID | _SAVINGS_CONFIRM | {"amount_rupiah"}, set()),
+    "savings-move": (_SAVINGS_ID | {"direction", "amount_rupiah", "idempotency_key"}, {"description"}),
+}
 _FIELDS = {
+    **_SAVINGS_FIELDS,
     **_BUDGET_FIELDS,
     **_EMERGENCY_FIELDS,
     "add": ({"transaction_type", "amount_rupiah", "category", "occurred_at", "idempotency_key"}, {"description"}),
@@ -158,6 +173,15 @@ def main(argv: list[str] | None = None) -> int:
             return _emit(0, operation=args.operation, data=_budget_request(path, args.operation, payload))
         if args.operation in _EMERGENCY_FIELDS:
             return _emit(0, operation=args.operation, data=_emergency_request(path, args.operation, payload))
+        if args.operation in _SAVINGS_FIELDS:
+            store_savings = SavingsStore(path)
+            handlers: dict[str, Callable[..., Any]] = {
+                "savings-create": store_savings.create, "savings-list": store_savings.list_goals,
+                "savings-get": store_savings.get, "savings-history": store_savings.history,
+                "savings-preview": store_savings.preview, "savings-update": store_savings.update,
+                "savings-opening": store_savings.opening, "savings-move": store_savings.move,
+            }
+            return _emit(0, operation=args.operation, data=handlers[args.operation](**payload))
         store = TransactionStore(path, read_only=not writing, defer_init=writing)
         if args.operation == "add":
             data: Any = asdict(store.add_transaction(**payload))
@@ -201,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
         return _emit(8, code="budget_exists", message=str(exc))
     except BudgetNotFound as exc:
         return _emit(4, code="budget_not_found", message=str(exc))
+    except SavingsNotFound as exc:
+        return _emit(4, code="savings_not_found", message=str(exc))
     except TransactionNotFound as exc:
         return _emit(4, code="transaction_not_found", message=str(exc))
     except ValueError as exc:
