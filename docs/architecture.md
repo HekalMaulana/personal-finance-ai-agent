@@ -108,11 +108,21 @@ Tidak ada proses yang memutar ulang otomatis, tidak ada jurnal terpisah, dan tid
 
 Konfirmasi dengan revisi yang ditinjau dan alasan diperlukan untuk saldo awal dan perubahan target. Gate CLI mengikuti pola pernyataan `confirmed:true`, bukan autentikasi konfirmasi pengguna; skill menegakkan giliran pratinjau dan persetujuan. Koreksi saldo awal hanya menambah selisih; saldo tidak boleh negatif. Tidak ada edit/hapus mutasi, transfer otomatis, atau rekonsiliasi bank. Tenggat hanya informasi; ETA dibulatkan ke atas dari kekurangan dibagi setoran bulanan eksplisit yang tidak disimpan. Worksheet hanya dimutakhirkan melalui ekspor eksplisit; baris efektif dan tipe sel teks diperiksa setelah membuka kembali workbook sementara.
 
+## Analisis terjadwal — Lesson 6A
+
+`finance_analysis.py` memakai ledger fiktif bernama yang sudah ada dan validasi path CLI yang sama. Tidak ada koneksi ke database utama, model, Excel, atau gateway. Aplikasi CLI analisis menjalankan pemeriksaan catch-up setiap kali `run-due` diluncurkan; CLI pencatatan dan sesi Hermes biasa tidak memicu pekerjaan.
+
+- `weekly` memakai tanggal Senin awal minggu sebagai ID periode. Senin pukul 09.00 Asia/Pontianak, pekerjaan mengevaluasi Senin sebelumnya 00.00 hingga Senin saat jadwal 00.00 (eksklusif). Versi efektif transaksi dipilih sebelum filter waktu; pemasukan dan pengeluaran dijumlahkan sebagai integer Rupiah, arus kas = pemasukan − pengeluaran, bukan saldo rekening. Realisasi minggu dibagi per bulan dan kategori, lalu dibandingkan dengan pagu bulanan efektif saat eksekusi; ini bukan realisasi sebulan penuh atau anggaran mingguan yang diprorata.
+- `quarterly` memakai `YYYY-Qn` dari jadwal 1 Januari/April/Juli/Oktober pukul 09.00 Asia/Pontianak (UTC+07:00 tetap). Engine memakai `read_fund_summary` pada snapshot SQLite saat eksekusi; `observed_at` berbeda dari `due_at`. Saldo adalah alokasi yang dilaporkan, bukan saldo bank ataupun rekonstruksi historis. Nilai belum ditetapkan tetap `null`.
+- Ledger menyimpan tabel aditif `analysis_runs`, kunci utama `(kind, period)`. `run-due` memasukkan kandidat `pending` tanpa menimpa baris, kemudian menyimpan `running` dengan nomor percobaan. `BEGIN IMMEDIATE` memagari pembacaan data, penghitungan, dan commit `completed` beserta hasil atau `failed` beserta kode kegagalan. Hasil selesai tidak dihitung ulang, termasuk setelah koreksi ledger. Engine menolak trigger pada jurnal di bawah lock yang sama. Lock writer SQLite berlaku selama penghitungan; operasi penulisan lain bisa tertunda.
+- Proses terhenti melepaskan lock SQLite. Runner berikutnya memeriksa ulang status dan nomor percobaan di bawah lock; `running` dapat diteruskan dengan nomor yang sama, tanpa hasil ganda. Kerja komputasi yang belum commit bisa diulang. Jika penyimpanan status gagal, gunakan `status` sebelum mencoba lagi; baris `running` tidak membuktikan worker masih hidup. `failed` memerlukan `run-due --resume KIND PERIOD`, maksimal tiga percobaan total. Kode kegagalan tidak berisi data ledger atau pesan internal mentah.
+- Jendela catch-up bergulir: empat minggu terakhir dan paling banyak satu triwulan, dari yang paling lama dalam jendela. Periode yang terlewat di luar jendela tidak dimaterialisasi. Baris lama yang sudah tercatat tetapi belum selesai dapat diperiksa di `history` atau dilanjutkan eksplisit dengan `--resume`. `check-due`, `status`, dan `history` memakai `mode=ro` dan tidak membuat tabel. Tidak ada pemicu otomatis, pengiriman hasil, atau perubahan pada tabel keuangan.
+
 ## Desain berikutnya — belum diimplementasikan
 
 | Lapisan | Rancangan dan syarat verifikasi |
 | --- | --- |
 | Penggunaan SQLite di luar uji fiktif | Belum aktif. Evaluasi kontrol akses, penanganan kehilangan konteks, dan perilaku penolakan sebelum memperluas cakupan. |
-| Penjadwalan | Rencana untuk tinjauan mingguan, evaluasi triwulanan dana darurat, dan pemulihan tinjauan yang terlewat ketika perangkat mati. Definisikan cara mencegah eksekusi ganda sebelum diaktifkan. |
+| Pemicu otomasi | Engine dan catch-up sudah tersedia via CLI; cron, gateway, dan pengiriman notifikasi belum diaktifkan. |
 
 Urutan pengembangan yang disarankan: evaluasi perilaku agen → uji lapisan penyimpanan dengan data fiktif → verifikasi ekspor → evaluasi penjadwalan. Rancangan ini bukan izin untuk membuat database, integrasi, atau otomasi. Tidak ada tindakan perbankan atau investasi di dalam cakupan proyek.

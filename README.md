@@ -6,9 +6,9 @@ An Indonesian-language Hermes Agent prototype for tracking fictional transaction
 
 | Status | Scope |
 | --- | --- |
-| Implemented | Transactions, filters and summaries, versioned corrections, recovery after interrupted writes, monthly budgets, emergency funds, savings goals, and on-demand Excel export. The analysis skill can work without saving data. |
+| Implemented | Transactions, filters and summaries, versioned corrections, recovery after interrupted writes, monthly budgets, emergency funds, savings goals, on-demand Excel export, and a scheduled analysis engine with manual CLI startup. The analysis skill can work without saving data. |
 | Tested | Deterministic Python, SQLite, and Excel tests on Windows and Ubuntu under WSL. See [evaluation](docs/evaluation.md) for separate evidence from earlier Hermes conversation tests. |
-| Planned | Real VPS validation, Telegram integration, scheduled reviews, and reminders. |
+| Planned | Real VPS validation, Telegram integration, automatic schedule triggers, and reminders. |
 
 ## Technology Stack
 
@@ -83,6 +83,25 @@ Use a new fictional ledger called `lesson5d-demo`. Try these in order. The agent
 
 The first prompt creates the ledger. Keep that name for later operations, and review changes that require confirmation. The [CLI walkthrough](docs/usage.md) includes commands and expected output.
 
+## Scheduled Analysis (Lesson 6A)
+
+Run `finance_analysis.py` with the project interpreter from the clone. The commands below use Linux Bash; on Windows PowerShell replace `./.venv/bin/python` with `.\.venv\Scripts\python.exe`. Use an existing fictional ledger. No stdin JSON is needed; output is JSON.
+
+```bash
+./.venv/bin/python -B finance_analysis.py --ledger lesson5d-demo check-due
+./.venv/bin/python -B finance_analysis.py --ledger lesson5d-demo run-due
+./.venv/bin/python -B finance_analysis.py --ledger lesson5d-demo history --limit 10
+./.venv/bin/python -B finance_analysis.py --ledger lesson5d-demo status weekly 2026-11-16
+./.venv/bin/python -B finance_analysis.py --ledger lesson5d-demo run-due --resume weekly 2026-11-16
+```
+
+Replace the sample period with an ID returned by `run-due` or `history`: `weekly YYYY-MM-DD` (the week's starting Monday) or `quarterly YYYY-Qn`. `check-due` previews due work and does not write. On application startup, `run-due` checks the latest four due weeks and latest due quarter, oldest first. Older unrecorded periods are skipped. Use `--resume` only for an existing unfinished job; failed jobs require this explicit retry and are limited to three attempts total. Inspect each returned job's `status` (`pending`, `running`, `completed`, `failed`); the CLI's `ok` means the command returned successfully, not that every analysis completed.
+
+- Mondays 09:00 Asia/Pontianak: prior calendar week, Monday 00:00 through the next Monday 00:00 exclusive. Weekly spending uses effective transactions and is compared with the effective monthly budget for each month the week touches. Cash flow is not bank balance.
+- January 1, April 1, July 1, October 1 at 09:00 Asia/Pontianak: emergency fund balance, target, coverage, progress, and shortfall. Catch-up reports the allocation observed when the job actually ran, not a historical or bank balance.
+
+`run-due` writes only its SQLite journal. No Excel export, model call, Hermes cron, gateway, or Telegram is enabled.
+
 ## Data Storage & Privacy
 
 - Named ledgers go in `data/finance-cli/<name>.db` relative to the clone, not the shell's working directory. The separate library default (`data/finance.db`) is not used by the agent or tutorial.
@@ -129,6 +148,7 @@ finance_budgets.py          Monthly budgets
 finance_emergency.py        Emergency fund allocations
 finance_savings.py          Savings goals
 finance_reporting.py        Verified Excel export
+finance_analysis.py         Scheduled analysis and SQLite run journal
 requirements-reporting.txt  Reporting dependency
 tests/                      Deterministic regression tests
 docs/                       Architecture, usage, evaluation, and deployment
@@ -138,7 +158,7 @@ docs/                       Architecture, usage, evaluation, and deployment
 
 1. Verify a fresh Linux Hermes install and run a focused conversational check.
 2. Measure memory and disk use on a real VPS and test restart and recovery.
-3. Test Telegram access controls, write confirmations, and report handling with fictional data before adding reminders or scheduled reviews.
+3. Test Telegram access controls, write confirmations, and report handling with fictional data before enabling reminders or scheduled triggers.
 
 ## Security Disclaimer
 
@@ -150,4 +170,6 @@ Use fictional fixtures, add focused tests for behavior changes, and run the full
 
 ## License
 
-No project license has been approved and no `LICENSE` file is included. Public availability would not by itself grant redistribution or modification rights. MIT is a candidate for maintainer review, not a license grant.
+The original project code and documentation are available under the [MIT License](LICENSE). Keep the copyright and permission notices when redistributing copies or substantial portions.
+
+Hermes Agent, Python, SQLite, and reporting dependencies are separate and retain their own terms. The project does not bundle them. If redistributing `openpyxl` or its `et-xmlfile` dependency, retain their upstream notices and license files, including `et-xmlfile`'s Python license notice for included standard-library code. The project's MIT license does not relicense third-party components.

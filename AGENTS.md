@@ -29,12 +29,13 @@
 ## Target tabungan fiktif — Lesson 5C
 - Gunakan `finance-savings` pada ledger fiktif yang sudah ada dan disepakati. Tinjau dan konfirmasi sebelum mencatat/mengoreksi saldo awal atau mengubah target. Verifikasi dari SQLite. Alokasi per target terpisah dari transaksi umum dan dana darurat; tidak ada transfer atau ekspor otomatis.
 
+## Analisis terjadwal fiktif — Lesson 6A
+- Jalankan `finance_analysis.py` hanya pada ledger fiktif yang sudah ada dan disepakati. `check-due`, `status`, dan `history` tidak menulis; `run-due` menjalankan catch-up dan hanya menulis jurnal analisis. Jangan jalankan pekerjaan atau retry dari percakapan tanpa permintaan eksplisit.
+- Jangan menyamakan arus kas dengan saldo bank atau snapshot dana darurat saat eksekusi dengan saldo pada tanggal jatuh tempo. Tidak ada ekspor otomatis.
+
 ## Rencana kemampuan — belum diaktifkan
 - Penggunaan pencatatan percakapan di luar ledger uji fiktif.
-- Analisis keuangan setiap minggu.
-- Evaluasi kebutuhan dana darurat setiap tiga bulan.
-- Otomasi atau pengingat target tabungan.
-- Pemeriksaan jadwal yang terlewat saat laptop sebelumnya mati.
+- Pemicu otomatis untuk analisis terjadwal dan pengingat target tabungan.
 
 ## Batasan keamanan — berlaku sekarang
 - Gunakan hanya data fiktif. Jangan mengakses data keuangan asli.

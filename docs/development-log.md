@@ -68,3 +68,9 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 - Menambah panduan Windows, Ubuntu, dan persiapan VPS, serta contoh CLI fiktif. Pengaturan provider tetap di Hermes; aplikasi tidak memerlukan `.env` sendiri. Telegram, layanan persisten saat reboot, dan kapasitas VPS 2 GB belum divalidasi.
 - Audit tidak mendeteksi kredensial atau artefak finansial. Commit lama tetap menyimpan email non-noreply; GitHub noreply telah diverifikasi untuk author dan committer baru. Tidak ada perubahan riwayat atau visibility. Lisensi MIT direkomendasikan untuk ditinjau, belum ditetapkan.
 - Verifikasi akhir: 9/9 tes reporting lulus pada Windows dan Ubuntu WSL; 73/73 regresi dan demo CLI-ke-Excel lulus pada Windows. Lihat [evaluasi Lesson 5D](evaluation.md#lesson-5d--open-source-readiness--cross-platform-deployment).
+
+## Lesson 6A — Scheduled Financial Analysis Engine
+
+- Lesson 5D (`1b7a963`) telah tersinkronisasi sebelum perubahan. Engine menambah jurnal SQLite per ledger dan CLI JSON terpisah untuk pemeriksaan jadwal, eksekusi/catch-up, status, dan riwayat. Mekanisme pemulihan SQLite tidak menambah baris hasil duplikat; kegagalan memerlukan retry eksplisit.
+- MIT ditambahkan untuk kode/dokumentasi asli dengan pemegang `hekal` dari metadata author proyek. Tidak ditemukan komponen vendored atau pemberitahuan lisensi lain pada sumber proyek. Metadata dan berkas lisensi `openpyxl` 3.1.5 serta `et-xmlfile` 2.0.0 diperiksa: keduanya MIT, dengan pemberitahuan lisensi Python tambahan pada `et-xmlfile`. Ketentuan upstream tetap berlaku, termasuk bila paket didistribusikan ulang; tidak ada paket yang dibundel atau dipasang.
+- Regresi Windows 84/84 dan uji terarah Ubuntu WSL 11/11 lulus; tidak ada LLM, cron, gateway, Telegram, atau konfigurasi Hermes yang diubah. Lihat [evaluasi Lesson 6A](evaluation.md#lesson-6a--scheduled-financial-analysis-engine).
