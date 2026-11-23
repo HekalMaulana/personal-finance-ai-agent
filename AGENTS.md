@@ -41,10 +41,17 @@
 - Jangan mengakses atau mengubah proyek OpenCode lama.
 - Batas Lesson 3–5B: gunakan hanya basis data uji fiktif yang diotorisasi. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
 
-## Workflow dokumentasi dan Git
-1. Setelah perubahan penting, perbarui dokumentasi yang relevan (`README.md` atau `docs/`). Bedakan fitur yang sudah teruji (sertakan bukti), yang sedang dikembangkan, dan yang baru direncanakan. Jalankan pengujian yang relevan jika tersedia; catat yang tidak dijalankan dan alasannya.
-2. Periksa `git status`, `git diff`, dan file baru yang belum terlacak. Pastikan `.gitignore` berlaku sebelum staging. Periksa nama dan isi perubahan yang aman untuk ditinjau: jangan masukkan rahasia, data pribadi, database, atau laporan keuangan. Jangan membuka isi file yang diduga sensitif untuk memeriksanya. Jika menemukan file sensitif atau perubahan yang tidak terkait, hentikan proses commit dan laporkan masalahnya kepada pengguna tanpa menampilkan isinya.
-3. Stage hanya path yang relevan dan sudah diperiksa. Jangan gunakan `git add .` atau staging massal. Tinjau `git diff --cached`, jalankan `git diff --cached --check`, dan cocokkan daftar file staged dengan cakupan tugas sebelum commit.
-4. Sebelum commit pertama, tampilkan ringkasan perubahan, hasil verifikasi, dan daftar file yang diusulkan, lalu minta persetujuan eksplisit. Setelah commit awal disetujui, commit lokal untuk perubahan rutin yang sudah lolos verifikasi boleh dibuat tanpa persetujuan ulang. Gunakan format Conventional Commits (misalnya `docs:`, `feat:`, `fix:`, atau `test:`).
-5. Jangan melakukan push otomatis ke GitHub. Jangan menghapus atau menulis ulang riwayat Git, melakukan force push, atau mengubah remote tanpa persetujuan pengguna.
-6. Setelah commit, laporkan hash commit, daftar file yang berubah, dan hasil pengujian.
+## Efficient Development Workflow
+- Baca hanya file dan bagian yang relevan. Hindari pembacaan ulang kecuali file berubah atau ada informasi yang belum cukup.
+- Gunakan alat untuk perhitungan, pemeriksaan deterministik, dan verifikasi hasil. Jangan menebak hasil yang bisa diperiksa.
+- Jalankan tes terarah selama implementasi dan satu rangkaian regresi penuh pada kandidat final sebelum menutup milestone. Jika perbaikan mengubah kandidat yang sudah diuji, verifikasi ulang. Untuk tugas dokumentasi non-milestone, gunakan pemeriksaan yang relevan; nyatakan tes yang tidak dijalankan dan alasannya.
+- Ringkas hasil tes yang lulus; sertakan detail yang dibutuhkan untuk menindaklanjuti kegagalan. Hindari refactoring, dependensi, dan perubahan di luar cakupan yang tidak diperlukan.
+
+## Workflow dokumentasi dan Git otomatis
+1. Setelah milestone selesai dan tes lulus, perbarui dokumentasi yang relevan (`README.md` atau `docs/`). Bedakan hasil yang terverifikasi, pekerjaan yang masih berlangsung, dan rencana.
+2. Sebelum staging, periksa status Git, diff, file belum terlacak, dan aturan `.gitignore`. Tinjau nama file sebelum membaca diff yang aman. Jangan buka isi file yang diduga sensitif. Jangan commit database, laporan pribadi, data keuangan asli, token, atau kredensial. Jika ada temuan sensitif atau perubahan di luar cakupan, hentikan commit dan push; laporkan tanpa menampilkan isinya.
+3. Stage hanya path relevan yang telah ditinjau (`git add -- <path>`), bukan `git add .` atau staging massal. Periksa daftar file staged, tinjau diff, dan jalankan `git diff --cached --check`. Buat commit otomatis dengan Conventional Commits jika semua pemeriksaan lulus.
+4. Izin auto-push hanya berlaku untuk workspace `C:\AI-Project\personal-finance-hermes`, branch lokal `main`, dan remote `origin` dengan URL fetch dan push `https://github.com/HekalMaulana/personal-finance-ai-agent.git`. Jangan menerapkan izin ini pada repository lain. Cocokkan tujuan sebelum push dan pastikan remote `main` tidak berubah sejak pemeriksaan awal serta push hanya membawa commit yang telah diperiksa untuk milestone ini.
+5. Setelah commit berhasil, lakukan push normal dengan `git push origin main:main`. Verifikasi commit pada remote dengan `git ls-remote --exit-code origin refs/heads/main` dan bandingkan hash dengan commit lokal. Laporkan bila push atau verifikasi jarak jauh gagal; jangan mengklaim sukses hanya dari status lokal.
+6. Hentikan push dan laporkan jika tes gagal, ada file sensitif, remote berubah atau tidak dapat diverifikasi, atau ada konflik, divergensi, maupun penolakan Git. Jangan force push (termasuk `--force-with-lease`), menulis ulang riwayat, mengubah visibility, atau mengubah/menghapus remote.
+7. Laporkan perubahan, hasil tes, hash commit, hasil push yang terverifikasi, dan status Git.

@@ -104,4 +104,4 @@ Saldo ini alokasi yang dilaporkan pengguna, bukan saldo bank. Pemindahan alokasi
 - [Arsitektur](docs/architecture.md) — alur saat ini, batas keamanan, dan rancangan fitur berikutnya.
 - [Log pengembangan](docs/development-log.md) — milestone, eksperimen, dan keputusan desain.
 - [Evaluasi](docs/evaluation.md) — bukti yang tersedia, batas verifikasi, dan kasus uji berikutnya.
-- [Aturan agen dan kontribusi](AGENTS.md) — kebijakan analisis, peninjauan perubahan, dan commit lokal. Tidak ada push otomatis.
+- [Aturan agen dan kontribusi](AGENTS.md) — workflow efisien, tes terarah dan regresi milestone, serta commit Conventional Commits dan push normal otomatis hanya ke `origin/main` repository ini setelah verifikasi. Push dihentikan bila pemeriksaan gagal; hash remote diperiksa setelah push.
