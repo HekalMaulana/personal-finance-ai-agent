@@ -123,6 +123,8 @@ The [VPS guide](docs/deployment/vps.md) includes the fresh-clone checklist, opti
 
 **Lesson 7B — bound confirmation, offline only.** `finance_telegram.py` validates and previews fictional income or expenses, then binds confirmation to the same owner/private chat, operation ID and preview digest. The SQLite journal expires pending actions after five minutes and commits the ledger entry and audit state together. Test it with `-p test_telegram_actions.py` added to the commands below. [See the offline example and security audit](docs/deployment/telegram.md#lesson-7b-offline-bound-confirmation). Hermes has sender metadata inside the gateway, but the skill-to-shell path is not an authorization boundary. There is no live adapter; Telegram ledger reads, writes, corrections, and Excel delivery remain disabled.
 
+**Lesson 7C — offline gateway bridge and ledger isolation.** The official Hermes `pre_gateway_dispatch` hook can consume original owner DM commands before the model sees them. The Linux fixture service authenticates the gateway UID over a Unix socket and owns the SQLite file; neither the gateway nor the separate agent UID can open it. [Run the after-clone checks and review the remaining blockers](docs/deployment/telegram.md#lesson-7c-offline-trusted-bridge-and-ledger-isolation). Nothing is installed or enabled automatically: live Telegram ledger access (including status), corrections, exports, and delivery remain disabled.
+
 ## Testing
 
 From the clone with the reporting dependency installed:

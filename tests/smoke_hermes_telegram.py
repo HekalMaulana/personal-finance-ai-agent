@@ -14,6 +14,14 @@ FAKE_TOKEN = 'offline-fixture-not-a-bot-token'
 
 
 def probe(root):
+    import asyncio
+
+    with asyncio.Runner() as loop:
+        loop.get_loop()  # On Windows asyncio creates a private loopback socketpair.
+        probe_with_loop(root, loop)
+
+
+def probe_with_loop(root, loop):
     def offline(event, args):
         if event.startswith('socket.') and event not in {'socket.__new__', 'socket.gethostname'}:
             raise AssertionError(f'Unexpected network operation: {event}')
@@ -89,6 +97,69 @@ def probe(root):
     assert expected <= {entry['name'] for entry in result['skills']}
     skill = json.loads(skill_view('finance-transactions', preprocess=False))
     assert skill['success'] and '--ledger lesson3-demo summary' in skill['content']
+    probe_finance_hook(root, adapter, dm, loop)
+
+
+def probe_finance_hook(root, adapter, dm, loop):
+    from datetime import datetime, timezone
+    from unittest.mock import patch
+    from gateway.platforms.event import MessageEvent, MessageType
+    from gateway.run_inbound_hooks import GatewayInboundHooksMixin
+    from hermes_cli.plugins import PluginManager
+    from hermes_cli.plugins_context import PluginContext
+    from hermes_cli.plugins_manifest import PluginManifest
+
+    sys.path.insert(0, str(root))
+    from finance_storage import TransactionStore
+    from finance_telegram_bridge import FinanceIngress, LedgerRequests
+
+    path = root / 'bridge-fictional.db'
+    ledger = TransactionStore(path)
+    service = LedgerRequests(path, int(OWNER))
+    manager = PluginManager()
+    ctx = PluginContext(PluginManifest(name='finance-offline-fixture'), manager)
+    replies = []
+
+    async def reply(gateway, chat, text):
+        assert gateway is runner and chat == OWNER
+        replies.append(json.loads(text))
+
+    # The optional Telegram SDK is absent on some offline hosts. Use a typed
+    # fixture for its raw Message; run the actual Hermes hook dispatcher below.
+    class RawMessage(SimpleNamespace):
+        pass
+
+    ingress = FinanceIngress(int(OWNER), RawMessage, adapter.platform, service.dispatch)
+    ingress.register(ctx, reply)
+    runner = GatewayInboundHooksMixin()
+
+    async def dispatch(text, n, user=OWNER, **raw_fields):
+        source = dm(user)
+        raw = RawMessage(text=text, message_id=n, date=datetime.now(timezone.utc),
+                         from_user=SimpleNamespace(id=int(user), is_bot=False),
+                         chat=SimpleNamespace(id=int(user), type='private'), **raw_fields)
+        event = MessageEvent(text=text, message_type=MessageType.COMMAND, source=source,
+                             raw_message=raw, message_id=str(n), platform_update_id=n)
+        return await runner._hm_pre_gateway_dispatch_hook(event, source)
+
+    async def exercise():
+        prepare = '/finance prepare ' + json.dumps(dict(transaction_type='expense', amount_rupiah=120,
+            category='Fiktif', occurred_at='2026-01-01T12:00:00+07:00'))
+        assert await dispatch('simulation only', 1) is not None
+        assert await dispatch(prepare, 2, STRANGER) is None
+        assert await dispatch(prepare, 3, forward_origin=object()) is None
+        assert not replies
+        assert await dispatch(prepare, 4) is None
+        preview, = replies
+        assert preview['status'] == 'prepared' and ledger.cash_flow().transaction_count == 0
+        confirm = f"/finance confirm {preview['operation_id']} {preview['preview_digest']}"
+        assert await dispatch(confirm, 5) is None
+        assert replies[-1]['status'] == 'committed' and ledger.cash_flow().total_expense == 120
+        assert await dispatch(confirm, 5) is None
+        assert replies[-1] == {'error': 'replayed_message'}
+
+    with patch('hermes_cli.lifecycle.ainvoke_hook', manager.ainvoke_hook):
+        loop.run(exercise())
 
 
 def main():
