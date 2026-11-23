@@ -36,9 +36,10 @@
 ## Cron Hermes opsional — Lesson 6B
 - `finance_cron.py` hanya untuk ledger fiktif dan profil privat. Dry-run tidak mengubah state; instalasi eksplisit membuat job paused. Aktivasi terpisah memerlukan `resume --confirm`. Gunakan `--no-agent` dan delivery lokal; jangan aktifkan job, gateway, atau service dalam pengujian pengembangan.
 
-## Gateway Telegram opsional — Lesson 7A
+## Gateway Telegram opsional — Lesson 7A/7B
 - Telegram hanya untuk uji fiktif melalui DM pemilik. Allowlist identitas bukan otorisasi perubahan data. Jangan kirim data, file laporan, atau hasil analisis ke grup/kanal dan jangan aktifkan pengiriman terjadwal.
 - Profil Telegram baseline hanya boleh membaca skill dan melakukan simulasi tanpa akses ledger. Tolak permintaan mengubah SQLite melalui Telegram; arahkan pemilik ke CLI lokal. Jangan menyiapkan transaksi, menjalankan analisis terjadwal, atau mencoba SQL/akses file langsung dari Telegram.
+- `finance_telegram.py` hanya untuk pengujian offline dengan harness tepercaya dan ledger terisolasi; jangan daftarkan sebagai tool/skill atau mengganti jalur dengan shell. ID atau konfirmasi dari prompt, argumen, dan environment shell bukan bukti otorisasi. Terapkan pembatasan akses di luar instruksi ini.
 - Untuk perubahan lokal yang diminta lewat percakapan, tampilkan pratinjau ledger, operasi, nilai lama dan baru bila relevan, serta versi dan alasan yang diwajibkan skill. Tunggu jawaban eksplisit atas pratinjau sebelum memanggil operasi yang menulis, termasuk `prepare-add`; ikuti validasi, versi dan idempotensi CLI. Jangan terima persetujuan ambigu, kutipan, atau persetujuan lama setelah payload/sesi berubah. Jika hasil tidak pasti, baca status/riwayat sebelum retry.
 
 ## Rencana kemampuan — belum diaktifkan
