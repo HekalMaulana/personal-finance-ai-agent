@@ -115,7 +115,7 @@ The [cron deployment guide](docs/deployment/cron.md) covers dry-run, installatio
 
 ## VPS Deployment Overview
 
-The [VPS guide](docs/deployment/vps.md) describes a single-user Linux setup with persistent storage and a detachable SSH session. It has not been verified on a real VPS. Treat 2 GB RAM as a trial configuration, not a verified requirement.
+The [VPS guide](docs/deployment/vps.md) includes the fresh-clone checklist, optional Hermes-managed systemd gateway, and SQLite recovery. Service startup after reboot and 2 GB RAM capacity have not been verified on a real VPS.
 
 ## Telegram Integration
 

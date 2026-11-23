@@ -35,4 +35,15 @@ The daily trigger is stable across installer reruns and gateway restarts because
 ./.venv/bin/python -B finance_cron_runner.py --ledger lesson5d-demo run
 ```
 
-Run manually after 09:00 WIB, including after restart. The same runner also works from an existing private OS scheduler; on an explicitly UTC scheduler the equivalent daily hour is 02:00. OS scheduler registration and automatic gateway ticks were not exercised in this milestone. Use local output only; Telegram remains planned.
+Run manually after 09:00 WIB, including after restart. On an explicitly UTC scheduler the equivalent daily hour is 02:00. Lesson 6A checks at most the four latest due weeks and the latest due quarter; it does not replay every missed daily trigger. See [VPS service setup and recovery](vps.md#persistent-scheduler-explicit-vps-opt-in) for persistent operation.
+
+## Disposable smoke test
+
+With a compatible Hermes executable and from the checkout, run:
+
+```bash
+export FINANCE_HERMES_EXECUTABLE=/absolute/path/to/hermes
+./.venv/bin/python -B tests/smoke_hermes_cron.py
+```
+
+Set the executable path to your actual launcher (`.exe` on Windows). If a managed launcher cannot resolve its dependency environment when the profile is isolated, verify the existing environment's Hermes entry point in the disposable smoke; do not repair your normal profile for this test. The smoke keeps the job paused, verifies that a native `cron tick` skips it, and runs the registered script directly to check failure recording and bounded replay without changing the clock. It does not start a gateway, install a service, or use your actual profile or ledger. Timed gateway firing is a separate, explicitly authorized VPS acceptance check.

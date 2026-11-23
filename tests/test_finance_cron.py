@@ -1,6 +1,8 @@
 """Offline fixtures for the portable Hermes trigger."""
 import json
+import os
 import shutil
+import stat
 import subprocess
 import sys
 import unittest
@@ -212,3 +214,25 @@ class InstallerTests(unittest.TestCase):
             self.scheduler.apply('install', ledger='demo', confirm=True)
         self.assertFalse(self.scheduler.script.exists())
         self.assertFalse(self.database.exists())
+
+    @unittest.skipUnless(os.name == 'posix', 'POSIX file modes and venv symlink')
+    def test_linux_bound_runner_uses_private_script_and_absolute_venv_from_other_cwd(self):
+        from datetime import datetime, timezone
+
+        python = self.checkout / 'project venv/bin/python'
+        subprocess.run([sys.executable, '-m', 'venv', '--without-pip', str(python.parent.parent)],
+                       check=True, timeout=20)
+        self.scheduler.python = python
+        self.assertEqual(self.scheduler.apply('install', ledger='demo', confirm=True)['state'], 'paused')
+        self.assertEqual(self.jobs[0]['interpreter'], str(python))
+        self.assertEqual(stat.S_IMODE(self.scheduler.script.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(self.scheduler.script.parent.stat().st_mode), 0o700)
+        self.assertEqual(stat.S_IMODE(self.scheduler.owner.stat().st_mode), 0o600)
+        self.assertEqual(self.scheduler.apply('resume', confirm=True)['state'], 'active')
+        next_run = datetime.fromisoformat(self.jobs[0]['next_run_at']).astimezone(timezone.utc)
+        self.assertEqual((next_run.hour, next_run.minute), (2, 0))
+        self.assertEqual(self.scheduler.apply('pause')['state'], 'paused')
+        subprocess.run([str(python), '-B', str(self.scheduler.script)], cwd=self.home,
+                       env={'TZ': 'UTC'}, capture_output=True, check=True, timeout=20)
+        self.assertFalse((self.home / 'data').exists())
+        self.assertFalse(list(self.root.rglob('*.xlsx')))

@@ -27,4 +27,4 @@ Target: Ubuntu 24.04 LTS. The CLI and Excel workflows were tested under Ubuntu 2
 
 ## Optional scheduled analysis
 
-Follow the [cron deployment guide](cron.md) after cloning. The explicit `Asia/Pontianak` job timezone works independently of an Ubuntu host's UTC timezone on compatible Hermes builds. The direct runner was tested on Ubuntu WSL; Hermes was not installed there. If the gateway or required flags are unavailable, use the manual fallback.
+Follow the [cron deployment guide](cron.md) and [VPS acceptance checklist](vps.md#fresh-clone-acceptance-checklist) after cloning. For scheduler-only use, create the venv but skip reporting dependencies, model setup, and full test discovery. Run `./.venv/bin/python -B -m unittest discover -s tests -p test_finance_cron.py -q`, then repeat with `-p test_scheduled_analysis.py`. Ubuntu WSL checks exercised the bound runner, private file modes, and venv path, not native Linux Hermes. The pinned `Asia/Pontianak` schedule maps to 02:00 UTC. If the gateway or required flags are unavailable, use the manual fallback.
