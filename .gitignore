@@ -20,6 +20,10 @@ id_rsa*
 id_ed25519*
 /.hermes/*
 !/.hermes/skills/
+/.hermes/skills/*
+!/.hermes/skills/*/
+/.hermes/skills/*/*
+!/.hermes/skills/*/SKILL.md
 
 # Local financial data, databases, and exports (including sidecars)
 data/

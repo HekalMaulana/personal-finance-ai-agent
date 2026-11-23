@@ -167,10 +167,13 @@ class ReportingIntegrationTests(unittest.TestCase):
         for name in ("finance_cli.py", "finance_storage.py", "finance_budgets.py", "finance_emergency.py", "finance_savings.py", "finance_reporting.py"):
             copyfile(ROOT / name, self.root / name)
 
+        foreign_cwd = self.root / "unrelated working directory"
+        foreign_cwd.mkdir()
+
         def cli(script, operation, payload=None, ledger="lesson4-fixture"):
-            result = subprocess.run([sys.executable, "-B", script, "--ledger", ledger, operation],
+            result = subprocess.run([sys.executable, "-B", str(self.root / script), "--ledger", ledger, operation],
                                     input=json.dumps(payload or {}).encode(), capture_output=True,
-                                    cwd=self.root, timeout=15)
+                                    cwd=foreign_cwd, timeout=15)
             self.assertEqual(result.stderr, b"", result)
             response = json.loads(result.stdout)
             self.assertEqual(response["ok"], result.returncode == 0)
@@ -187,7 +190,11 @@ class ReportingIntegrationTests(unittest.TestCase):
             self.assertTrue(cli("finance_cli.py", operation, {"id": original["id"]} if operation == "history" else {})["ok"])
         self.assertFalse(self.out.parent.exists())
         self.assertFalse(cli("finance_reporting.py", "summary")["ok"])
+        self.assertTrue((self.root / "data" / "finance-cli" / "lesson4-fixture.db").is_file())
         result = cli("finance_reporting.py", "export")
+        self.assertFalse((foreign_cwd / "data").exists())
+        self.assertFalse((foreign_cwd / "reports").exists())
+        self.assertFalse((self.root / "data" / "finance.db").exists())
         self.assertEqual(result["data"], {"path": "reports/laporan-keuangan.xlsx", "ledger": "lesson4-fixture",
                                           "transaction_count": 1, "verified": True})
         with closing(load_workbook(self.out, read_only=True)) as wb:

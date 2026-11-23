@@ -61,3 +61,10 @@ Log ini mencatat keputusan dan bukti; status Git commit tetap ditentukan oleh ri
 
 - Menambah konfigurasi berversi dan riwayat alokasi terpisah dari ledger pemasukan/pengeluaran. Saldo awal eksplisit; koreksi saldo awal menambah selisih yang disetujui tanpa mengubah riwayat. Tidak ada edit setoran/penarikan, saldo negatif, atau pembacaan bank.
 - Menghubungkan skill Hermes dan sheet Dana Darurat tanpa ekspor otomatis. Suite 66/66 lulus; dua sesi Hermes terisolasi membuktikan pencatatan dan pembacaan ulang lintas sesi, dengan verifikasi SQLite terpisah. Lihat [evaluasi Lesson 5B](evaluation.md#lesson-5b--dana-darurat).
+
+## Lesson 5D — Open-Source Readiness & Cross-Platform Deployment
+
+- Skill yang memanggil CLI memakai Python dari venv proyek sesuai platform. Ledger dan workbook tetap relatif terhadap root proyek; modul keuangan dan batas ledger tidak berubah.
+- Menambah panduan Windows, Ubuntu, dan persiapan VPS, serta contoh CLI fiktif. Pengaturan provider tetap di Hermes; aplikasi tidak memerlukan `.env` sendiri. Telegram, layanan persisten saat reboot, dan kapasitas VPS 2 GB belum divalidasi.
+- Audit tidak mendeteksi kredensial atau artefak finansial. Commit lama tetap menyimpan email non-noreply; GitHub noreply telah diverifikasi untuk author dan committer baru. Tidak ada perubahan riwayat atau visibility. Lisensi MIT direkomendasikan untuk ditinjau, belum ditetapkan.
+- Verifikasi akhir: 9/9 tes reporting lulus pada Windows dan Ubuntu WSL; 73/73 regresi dan demo CLI-ke-Excel lulus pada Windows. Lihat [evaluasi Lesson 5D](evaluation.md#lesson-5d--open-source-readiness--cross-platform-deployment).

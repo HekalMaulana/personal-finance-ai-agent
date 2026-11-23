@@ -1,122 +1,153 @@
 # Personal Finance AI Assistant
 
-Prototipe asisten keuangan pribadi berbahasa Indonesia berbasis Hermes Agent. Proyek ini menunjukkan bagaimana instruksi proyek dan skill yang dapat ditinjau di Git membantu agen menghasilkan analisis keuangan yang transparan, mengakui data yang belum tersedia, dan tetap berada dalam batas izin. **Hanya untuk simulasi dengan data fiktif.**
+An Indonesian-language Hermes Agent prototype for tracking fictional transactions, explaining cash flow, and trying personal finance plans. The Python CLI works without an LLM or provider account. Use synthetic data only.
 
-## Teknologi dan arsitektur
+## Features
 
-- **Hermes Agent** menjalankan percakapan dan memuat skill proyek pada sesi yang memenuhi syarat. CLI yang diperiksa dalam pengembangan: v0.23.3.
-- **Markdown dan YAML frontmatter** mendefinisikan aturan proyek (`AGENTS.md`) dan prosedur analisis (`SKILL.md`).
-- **Python 3.12+ dan `sqlite3`** menyediakan penyimpanan lokal mandiri tanpa dependensi eksternal. Lokasi default adalah `data/finance.db`.
-- **Git** mencatat perkembangan kode, dokumentasi, dan skill. `.gitignore` membantu mengecualikan database dan artefak lokal, tetapi tidak menggantikan pemeriksaan sebelum commit.
-
-Skill `personal-finance-analysis` tetap untuk analisis tanpa pencatatan. Skill [`finance-transactions`](.hermes/skills/finance-transactions/SKILL.md) menghubungkan permintaan eksplisit ke CLI untuk ledger uji fiktif saja. Lihat [arsitektur](docs/architecture.md) untuk skema dan batas akses.
-
-## Status proyek
-
-| Status | Cakupan |
+| Status | Scope |
 | --- | --- |
-| Tersedia, evaluasi awal lulus | Tiga uji percakapan lulus: penemuan skill, analisis keuangan fiktif, dan estimasi dengan data tidak lengkap. Lihat [hasil dan batas evaluasi](docs/evaluation.md). |
-| Tersedia, teruji mandiri | Penyimpanan SQLite lokal untuk data fiktif: tambah, baca, filter, total arus kas, dan retry idempoten. |
-| Dalam pengembangan | Evaluasi konsistensi percakapan lintas sesi dan kasus tepi. Belum ada pengujian keamanan menyeluruh. |
-| Teruji end-to-end untuk ledger fiktif | Hermes memuat `finance-transactions`, mencatat dua transaksi, mengulangi satu permintaan tanpa duplikasi, dan membaca ringkasan dari proses CLI baru. Lihat [bukti dan batas uji](docs/evaluation.md#lesson-3-tahap-b--cli-dan-percakapan-hermes). |
-| Tersedia untuk ledger fiktif | Koreksi transaksi dengan riwayat append-only dan perlindungan versi lama. Gunakan `get` dengan `include_version: true`, lalu `correct` atau `history`. |
-| Tersedia, teruji lewat CLI | Ekspor Excel atas permintaan eksplisit dari ledger fiktif; lihat [pengujian Lesson 4](docs/evaluation.md#lesson-4--excel-reporting-on-demand). |
-| Tersedia untuk ledger fiktif | Anggaran bulanan dan realisasi efektif dari SQLite; pembaruan memakai konfirmasi dan audit versi. Lihat [evaluasi Lesson 5A](docs/evaluation.md#lesson-5a--anggaran-bulanan). |
-| Tersedia untuk ledger fiktif | Dana darurat dengan saldo awal eksplisit, mutasi terpisah, audit konfigurasi, dan proyeksi dari setoran rutin yang diberikan. Lihat [evaluasi Lesson 5B](docs/evaluation.md#lesson-5b--dana-darurat). |
-| Direncanakan, belum aktif | Penggunaan database utama dari percakapan, tinjauan mingguan, evaluasi dana darurat triwulanan, dan pengecekan jadwal terlewat. |
+| Implemented | Transactions, filters and summaries, versioned corrections, recovery after interrupted writes, monthly budgets, emergency funds, savings goals, and on-demand Excel export. The analysis skill can work without saving data. |
+| Tested | Deterministic Python, SQLite, and Excel tests on Windows and Ubuntu under WSL. See [evaluation](docs/evaluation.md) for separate evidence from earlier Hermes conversation tests. |
+| Planned | Real VPS validation, Telegram integration, scheduled reviews, and reminders. |
 
-## Mencoba prototipe
+## Technology Stack
 
-1. Buka sesi Hermes dari direktori repositori. Skill ada di [`.hermes/skills/personal-finance-analysis/SKILL.md`](.hermes/skills/personal-finance-analysis/SKILL.md). Jika belum tersedia di sesi, periksa penemuan skill proyek dan status kepercayaan repositori. Sebagai alternatif, minta agen membaca `SKILL.md` langsung; pembacaan manual tidak membuktikan penemuan otomatis.
-2. Gunakan skenario fiktif di [dokumen evaluasi](docs/evaluation.md). Minta agen menampilkan rumus, asumsi, pertanyaan klarifikasi, dan saran yang tidak melebihi surplus rutin.
-3. Cocokkan hasil dengan nilai pembanding. Jangan masukkan data rekening, kredensial, atau transaksi asli.
+Hermes Agent for conversation and tool use, Markdown with YAML frontmatter for skills, Python with its built-in `sqlite3` module for the ledger, openpyxl for `.xlsx` export, and `unittest` for tests.
 
-### Menguji penyimpanan tanpa Hermes
+## Architecture Overview
 
-Untuk suite lengkap, jalankan `py -3.12 -B -m unittest discover -s tests -v` dari root dengan `openpyxl` tersedia. Uji Lesson 3 menggunakan ledger SQLite yang terpisah dari `data/finance.db`; uji Lesson 4 menggunakan direktori sementara tersendiri. Semua fixture fiktif.
-
-### Mencoba CLI dengan ledger fiktif
-
-Contoh di Bash dari root repositori (jangan pakai data nyata). Gunakan nama ledger yang sama untuk baca dan tulis:
-
-```bash
-python3 -B finance_cli.py --ledger lesson3-demo add <<'FINANCE_JSON'
-{"transaction_type":"expense","amount_rupiah":25000,"category":"Makanan","occurred_at":"2026-11-01T12:00:00+07:00","idempotency_key":"demo-makan-01"}
-FINANCE_JSON
-printf '%s\n' '{}' | python3 -B finance_cli.py --ledger lesson3-demo summary
+```text
+Hermes → project skills → Python CLI → SQLite → Excel (explicit export only)
 ```
 
-Untuk `get`, kirim `{"id":"<UUID hasil add>"}`; untuk `list`, kirim `{}` atau filter `start_date`, `end_date`, dan `transaction_type`. Dalam percakapan Hermes, pastikan `finance-transactions` ditemukan melalui `skills_list()` dan dimuat melalui `skill_view()`, lalu sebutkan ledger dan data fiktif yang memang diminta untuk disimpan. Tidak perlu mengubah konfigurasi global jika preload `--skills` ditolak.
+Skills define what to ask, when to confirm changes, and how to verify results. `finance_cli.py` accepts one UTF-8 JSON object on stdin for a named fictional ledger. `finance_reporting.py` reads SQLite and verifies the workbook before replacing the previous copy. Analysis-only requests do not need the CLI. See the [architecture notes](docs/architecture.md).
 
-### Mengoreksi transaksi fiktif
+## Prerequisites
 
-Di ledger yang sama, gunakan `get` dengan `{"id":"<UUID>","include_version":true}`. Setelah meninjau versi dan nilai sebelum/sesudah, kirim JSON ke `correct`, misalnya `{"id":"<UUID>","expected_version":0,"changes":{"amount_rupiah":25000},"reason":"Salah input","idempotency_key":"demo-correct-01"}`. Gunakan versi dan UUID dari hasil baca, bukan nilai contoh. `history` menerima `{"id":"<UUID>"}`. Di Hermes, skill menampilkan pratinjau dan menunggu konfirmasi sebelum menulis. Lihat [hasil uji Tahap C](docs/evaluation.md#lesson-3-tahap-c--koreksi-dan-audit-trail).
+- Git: tested with 2.56.1 on Windows and 2.43.0 on Ubuntu; older versions were not verified.
+- CPython **3.12 or later**, with `venv`, pip, and the bundled `sqlite3`. Verified baseline: Python 3.12.6 / SQLite 3.45.3 on Windows and Python 3.12.3 / SQLite 3.45.1 on Ubuntu. No separate SQLite installation is needed.
+- `openpyxl==3.1.5` for Excel and the full test suite. pip resolves its `et-xmlfile` dependency. Excel itself is not required.
+- For chat only: Hermes Agent with project-local skill discovery, and a tool-capable model from a provider you choose. Hermes v0.23.3 was checked on Windows; older releases were not verified. Hermes manages its own Python separately.
 
-### Memulihkan pencatatan setelah sesi berganti
+## Quick Start
 
-Untuk ledger fiktif, `prepare-add` menerima JSON yang sama seperti `add` dan menyimpan ID operasi sebelum mencatat transaksi. `commit-add` menerima `{"operation_id":"<UUID>"}`. Jika hasil tidak pasti, baca `operation-status` dengan ID atau `{"idempotency_key":"<key>"}` sebelum mencoba lagi. Jika keduanya hilang, `find-add` mencari kandidat, bukan menentukan identitas. Lihat [hasil uji pemulihan](docs/evaluation.md#lesson-3-tahap-d--pemulihan-pencatatan).
-
-### Membuat atau memperbarui laporan Excel
-
-Dari sesi Hermes di root proyek: “Buat laporan keuangan Excel terbaru untuk ledger fiktif lesson3-demo.” Untuk membuat ulang file yang sama: “Perbarui laporan Excel saya untuk ledger fiktif lesson3-demo.” Gunakan nama ledger fiktif yang sudah ada. Pertanyaan ringkasan pengeluaran saja tidak membuat file.
-
-CLI Windows (tidak perlu JSON stdin):
-
-```bash
-py -3.12 -B finance_reporting.py --ledger lesson3-demo export
+```text
+git clone https://github.com/HekalMaulana/personal-finance-ai-agent.git
+cd personal-finance-ai-agent
 ```
 
-Gunakan Python 3.12+ dengan `openpyxl` (`requirements-reporting.txt`). Python Windows 3.12 yang diperiksa sudah memiliki 3.1.5; `python3` bawaan Hermes yang diperiksa belum memilikinya. Siapkan dependensi hanya dengan persetujuan. Workbook `reports/laporan-keuangan.xlsx` adalah keluaran lokal yang diabaikan Git. Sheet Dashboard, Transaksi, dan Bulanan berasal dari versi transaksi efektif; Anggaran menampilkan pagu dan realisasi efektif untuk semua periode yang dikonfigurasi, atau “Belum dikonfigurasi” bila tidak ada pagu. Dana Darurat menampilkan saldo alokasi yang dilaporkan pengguna dan metrik target bila tersedia; Target Tabungan menampilkan saldo per target, progres, kekurangan, dan tenggat opsional, atau “Belum dikonfigurasi” bila kosong. Pembaruan mengganti seluruh workbook, termasuk edit manual. Tutup file di Excel jika terkunci.
+Create the project venv using the steps below. Run the offline tests, then configure Hermes for chat or skip to the [CLI walkthrough](docs/usage.md).
 
-Uji lengkap pada Windows: `py -3.12 -B -m unittest discover -s tests -v`.
+## Installation on Windows
 
-### Mengelola anggaran bulanan fiktif
+From the clone in PowerShell:
 
-Di Hermes: “Tetapkan anggaran Makanan Rp1.000.000 untuk November 2026 pada ledger fiktif lesson3-demo.” Ledger harus sudah ada. Gunakan [skill `finance-budgets`](.hermes/skills/finance-budgets/SKILL.md) untuk membuat, membaca sisa, menyaring kategori di atas 90%, atau meninjau perubahan sebelum mengonfirmasi. Tidak ada ekspor otomatis.
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-reporting.txt
+```
 
-CLI menggunakan `finance_cli.py --ledger NAMA OPERASI` dengan satu objek JSON di stdin:
+See the [Windows guide](docs/deployment/windows.md) for the native Hermes CLI, provider setup, and verification commands.
 
-| Operasi | Field JSON |
+## Installation on Linux
+
+From the clone on Ubuntu 24.04, after installing Python with venv support:
+
+```bash
+python3 -m venv .venv
+./.venv/bin/python -m pip install -r requirements-reporting.txt
+```
+
+See the [Linux guide](docs/deployment/linux.md) for system packages and Hermes setup.
+
+## Running Hermes Agent
+
+1. Install the [Hermes CLI](https://hermes-agent.nousresearch.com/docs/getting-started/installation). Run `hermes setup model` and `hermes doctor`. Use your own provider and the local terminal backend on the host where the clone and `.venv` live.
+2. From the Git root, review `AGENTS.md` and [`.hermes/skills/`](.hermes/skills/). Run `hermes skills trust` for this checkout and launch `hermes` from the same directory. You don't need to install global finance skills. See [Hermes project-local skills](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills#project-local-skills).
+3. In a new conversation, ask Hermes to list the project skills and load `personal-finance-analysis`. If discovery is unavailable, ask it to read the relevant reviewed `SKILL.md` from this checkout. That fallback does not prove automatic discovery.
+
+For an API-key provider, use its documented environment variable or the private Hermes environment file (`hermes config env-path` locates it). For OAuth, use Hermes's sign-in flow. The finance CLI requires no environment variables and does not load a project `.env`.
+
+## Usage Examples
+
+Use a new fictional ledger called `lesson5d-demo`. Try these in order. The agent normally replies in Indonesian. Use a separate clone if you don't want the export to replace an existing workbook.
+
+| Task | Sample prompt |
 | --- | --- |
-| `budget-create` | `period` (`YYYY-MM`), `category`, `amount_rupiah` (integer positif), `idempotency_key` |
-| `budget-get`, `budget-history` | `period`, `category` |
-| `budget-update` | Field create ditambah `expected_version` dari `budget-get`, `confirmed: true` setelah konfirmasi, dan `reason` |
-| `budget-summary` | `period`; opsional `category` dan `above_warning` (boolean; `true` berarti **lebih dari** 90%) |
+| Record an expense | “Catat pengeluaran uji fiktif Rp25.000 untuk Makanan di ledger `lesson5d-demo`, 1 November 2026 pukul 12:00 UTC+07:00.” |
+| Analyze without saving | “Simulasikan arus kas bulanan: pendapatan Rp8 juta dan pengeluaran Rp5 juta termasuk cicilan. Tampilkan rumus dan jangan simpan.” |
+| Set a budget | “Tetapkan anggaran Makanan Rp1 juta untuk November 2026 di ledger fiktif `lesson5d-demo`. Berapa sisanya?” |
+| Plan an emergency fund | “Di ledger fiktif `lesson5d-demo`, tetapkan kebutuhan esensial Rp5 juta per bulan dan target 3 bulan.” Then request a Rp6 million opening balance and ask for coverage. |
+| Set a savings goal | “Buat target Laptop Rp10 juta di ledger fiktif `lesson5d-demo`.” Then request a Rp2 million opening balance and confirm the preview. |
+| Export Excel | “Buat laporan Excel untuk ledger fiktif `lesson5d-demo`.” |
 
-Contoh JSON ringkasan: `{"period":"2026-11","category":"Makanan"}`. Nama kategori yang hanya berbeda kapitalisasi atau spasi berulang/tepi dihitung bersama. Sisa bisa negatif; status mendekati batas mulai 90% sampai 100% inklusif, dan melebihi batas setelah 100%. Tidak ada anggaran yang dibuat otomatis untuk kategori tanpa pagu.
+The first prompt creates the ledger. Keep that name for later operations, and review changes that require confirmation. The [CLI walkthrough](docs/usage.md) includes commands and expected output.
 
-### Mengelola dana darurat fiktif
+## Data Storage & Privacy
 
-Di Hermes, pilih ledger fiktif yang sudah ada. Contoh: “Untuk ledger fiktif lesson3-demo, tetapkan kebutuhan esensial Rp5.000.000 dan target 3 bulan.” Lalu: “Tetapkan saldo awal Rp6.000.000”, “Catat setoran Rp1.000.000”, dan “Berapa cakupan dana darurat jika setoran rutin saya Rp1.000.000 per bulan?” Skill [finance-emergency](.hermes/skills/finance-emergency/SKILL.md) meminta konfirmasi sebelum mengganti nilai tersimpan dan tidak mengekspor otomatis.
+- Named ledgers go in `data/finance-cli/<name>.db` relative to the clone, not the shell's working directory. The separate library default (`data/finance.db`) is not used by the agent or tutorial.
+- An explicit export replaces `reports/laporan-keuangan.xlsx`, even when you switch ledgers. Edits in Excel are not imported.
+- Do not upload databases, SQLite sidecars, workbooks, logs, backups, `.env` files, or credentials. `.gitignore` is not a substitute for checking the proposed commit. See [backup and recovery](docs/deployment/vps.md#backup-and-recovery).
+- SQLite is local, but chat prompts and tool results may reach your model provider and appear in local Hermes session logs. Use fictional data only.
 
-| Operasi `finance_cli.py --ledger NAMA` | Objek JSON di stdin |
+## VPS Deployment Overview
+
+The [VPS guide](docs/deployment/vps.md) describes a single-user Linux setup with persistent storage and a detachable SSH session. It has not been verified on a real VPS. Treat 2 GB RAM as a trial configuration, not a verified requirement.
+
+## Telegram Integration
+
+**Planned.** This repository does not configure or test a Telegram finance bot. Upstream Hermes gateway support does not verify this project's workspace, confirmations, or file handling over Telegram.
+
+## Testing
+
+From the clone with the reporting dependency installed:
+
+- Windows PowerShell: `.\.venv\Scripts\python.exe -B -m unittest discover -s tests -q`
+- Linux: `./.venv/bin/python -B -m unittest discover -s tests -q`
+- Targeted CLI-to-Excel smoke test: append `-p test_reporting.py -k test_cli_only_exports_on_explicit_operation` to either command.
+
+The tests create isolated fictional fixtures and need no credentials, network access, personal database, or Hermes session.
+
+## Troubleshooting
+
+| Symptom | Check |
 | --- | --- |
-| `emergency-configure` | `idempotency_key`, satu atau kedua `essential_rupiah`, `target_months`; `expected_version` jika sudah ada konfigurasi; `confirmed:true` dan `reason` untuk mengganti nilai yang sudah ada |
-| `emergency-opening` | `amount_rupiah` (boleh nol), `idempotency_key`; `expected_revision`, `confirmed:true`, `reason` untuk memperbaiki saldo awal |
-| `emergency-move` | `direction` (`deposit`/`withdrawal`), `amount_rupiah` positif, `idempotency_key`, opsional `description` |
-| `emergency-summary` | `{}` atau `monthly_contribution_rupiah` untuk estimasi, tanpa menyimpan asumsi |
-| `emergency-history` | `{}` membaca semua revisi konfigurasi dan mutasi beserta `request` asal ternormalisasi |
+| `hermes` not found | Open a new shell and check PATH against the official installer guide. |
+| `openpyxl` missing or `dependency_missing` | Install `requirements-reporting.txt` using the project venv interpreter, not Hermes's managed Python. |
+| Skills missing | Start from the Git root, review and trust the checkout, and start a new session. Check project discovery and the skills toolset. |
+| `database_not_found` | Explicitly record a fictional transaction first and reuse that ledger name. |
+| Export fails with Excel open | Close the workbook and retry. |
+| Provider or model error | Run `hermes setup model` and `hermes doctor`. Never paste keys or private diagnostic logs into an issue. |
 
-Saldo ini alokasi yang dilaporkan pengguna, bukan saldo bank. Pemindahan alokasi tidak ditulis sebagai pemasukan, pengeluaran, atau tabungan lain. Siapkan saldo awal eksplisit sebelum mencatat mutasi, termasuk jika saldonya Rp0.
+## Project Structure
 
-### Mengelola target tabungan fiktif
+```text
+.hermes/skills/             Six project-local skills
+finance_cli.py              Structured input and ledger dispatch
+finance_storage.py          SQLite transaction storage
+finance_budgets.py          Monthly budgets
+finance_emergency.py        Emergency fund allocations
+finance_savings.py          Savings goals
+finance_reporting.py        Verified Excel export
+requirements-reporting.txt  Reporting dependency
+tests/                      Deterministic regression tests
+docs/                       Architecture, usage, evaluation, and deployment
+```
 
-Gunakan [skill `finance-savings`](.hermes/skills/finance-savings/SKILL.md) pada ledger fiktif yang sudah ada. Misalnya: “Buat target Laptop Rp10.000.000 pada ledger fiktif lesson3-demo.” Untuk saldo awal Rp2.000.000, tinjau dan konfirmasi terlebih dahulu, lalu catat setoran Rp1.000.000. Estimasi memakai setoran rutin yang dinyatakan, tanpa menganggap surplus sebagai tabungan.
+## Roadmap
 
-| Operasi CLI | Objek JSON di stdin |
-| --- | --- |
-| `savings-create` | `name`, `target_rupiah` (integer positif), `idempotency_key`, opsional `due_date` (`YYYY-MM-DD`) |
-| `savings-list` | `{}` |
-| `savings-get`, `savings-history` | `id` UUID; `savings-get` juga menerima `monthly_contribution_rupiah` opsional |
-| `savings-preview` | `id` + `amount_rupiah` untuk saldo awal, atau `id`, `name`, `target_rupiah`, `due_date` untuk revisi target. `due_date` wajib untuk revisi: salin tenggat efektif jika tidak diubah, atau kirim `null` secara eksplisit untuk menghapus tenggat. |
-| `savings-opening`, `savings-update` | Objek `changes` dari pratinjau ditambah `confirmed:true`, `reason`, `idempotency_key` |
-| `savings-move` | `id`, `direction` (`deposit`/`withdrawal`), `amount_rupiah` (integer positif), `idempotency_key`, opsional `description` |
+1. Verify a fresh Linux Hermes install and run a focused conversational check.
+2. Measure memory and disk use on a real VPS and test restart and recovery.
+3. Test Telegram access controls, write confirmations, and report handling with fictional data before adding reminders or scheduled reviews.
 
-Saldo awal belum tersedia sebelum dikonfirmasi, berbeda dari Rp0. Setoran dan penarikan tidak memengaruhi transaksi umum atau dana darurat. Ekspor hanya atas permintaan. Lihat [evaluasi Lesson 5C](docs/evaluation.md#lesson-5c--target-tabungan).
+## Security Disclaimer
 
-## Dokumentasi pengembangan
+This prototype is not financial advice or production software. It does not connect to banks, move funds, or place trades. Hermes's local backend has your OS user's permissions; project instructions and repo trust are not a sandbox. Keep approvals enabled and review tool calls.
 
-- [Arsitektur](docs/architecture.md) — alur saat ini, batas keamanan, dan rancangan fitur berikutnya.
-- [Log pengembangan](docs/development-log.md) — milestone, eksperimen, dan keputusan desain.
-- [Evaluasi](docs/evaluation.md) — bukti yang tersedia, batas verifikasi, dan kasus uji berikutnya.
-- [Aturan agen dan kontribusi](AGENTS.md) — workflow efisien, tes terarah dan regresi milestone, serta commit Conventional Commits dan push normal otomatis hanya ke `origin/main` repository ini setelah verifikasi. Push dihentikan bila pemeriksaan gagal; hash remote diperiksa setelah push.
+## Contributing
+
+Use fictional fixtures, add focused tests for behavior changes, and run the full suite. For bug reports, include OS, Python and Hermes versions and a sanitized reproduction. See the [project rules](AGENTS.md) and [development log](docs/development-log.md). The maintainer's push rules do not transfer to other clones.
+
+## License
+
+No project license has been approved and no `LICENSE` file is included. Public availability would not by itself grant redistribution or modification rights. MIT is a candidate for maintainer review, not a license grant.

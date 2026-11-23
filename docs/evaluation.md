@@ -219,3 +219,14 @@ Semua fixture fiktif dan terisolasi; database utama tidak digunakan. `py -3.12 -
 | XLSX | Tidak dibuat sebelum ekspor; ketika file sudah ada, byte dan mtime tidak berubah oleh operasi tabungan. Ekspor eksplisit membaca ulang dua target, saldo/tenggat opsional, persentase terformat dan nama mirip formula yang tetap teks. SQLite tidak berubah. Pemeriksaan isi, bukan visual. |
 
 Hermes CLI v0.23.3 pada salinan sementara: sesi pertama membuat Laptop dan menampilkan pratinjau tanpa mencatat saldo awal. Sesi yang dilanjutkan menerima konfirmasi, menetapkan Rp2.000.000, dan mencatat setoran Rp1.000.000. Sesi baru tanpa resume menemukan key setoran dan membaca Rp3.000.000, 30%, Rp7.000.000, dan 7 bulan dari CLI. Verifikasi SQLite baca-saja menemukan tepat tiga revisi, nol transaksi umum, dan tidak ada workbook. Penemuan otomatis skill tidak tersedia di salinan sementara; agen membaca file skill lokal. Penarikan, koreksi, retry, dan ekspor diuji lewat CLI/API, bukan lewat percakapan.
+
+## Lesson 5D — Open-Source Readiness & Cross-Platform Deployment
+
+| Environment | Deterministic results |
+| --- | --- |
+| Windows 11, PowerShell 5.1; Python 3.12.6, SQLite 3.45.3, openpyxl 3.1.5 | 9/9 focused reporting tests and 73/73 regression tests passed. The PowerShell walkthrough produced one fictional expense and a verified Excel workbook. |
+| Ubuntu 24.04.2 LTS under WSL; Python 3.12.3, SQLite 3.45.1, openpyxl 3.1.5 | 9/9 focused reporting tests and 73/73 regression tests passed. The Bash walkthrough produced the same summary and a verified workbook. |
+
+Full runs used temporary local clones with the Lesson 5D changes applied, project venvs, and existing reporting packages. On WSL, only the two existing pure-Python packages (`openpyxl` and `et-xmlfile`) were exposed via `PYTHONPATH`; tests and outputs ran on the Linux filesystem. The integration test launches the CLI and exporter from a different working directory and checks that both outputs stay with the scripts. The default database was not created in either test clone. No dependencies were installed during verification, so the public installer and pip sequences were documented but not replayed from scratch.
+
+The Windows Hermes CLI version and trust command were checked; all six tracked skills were available in the existing workspace session. No new LLM calls or fresh-profile Hermes test were run. Linux Hermes chat, VPS startup and recovery, 2 GB capacity, and Telegram are unverified.

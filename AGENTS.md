@@ -42,13 +42,18 @@
 - Jangan memasang skill, MCP, atau dependensi tanpa persetujuan pengguna.
 - Jangan mengubah konfigurasi global Hermes.
 - Jangan mengakses atau mengubah proyek OpenCode lama.
-- Batas Lesson 3–5C: gunakan hanya basis data uji fiktif yang diotorisasi. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
+- Gunakan hanya basis data uji fiktif yang diotorisasi, termasuk saat menyiapkan deployment. Jangan membuat otomasi atau integrasi Telegram. Daftar rencana di atas bukan izin untuk mengaktifkan fitur.
 
 ## Efficient Development Workflow
 - Baca hanya file dan bagian yang relevan. Hindari pembacaan ulang kecuali file berubah atau ada informasi yang belum cukup.
 - Gunakan alat untuk perhitungan, pemeriksaan deterministik, dan verifikasi hasil. Jangan menebak hasil yang bisa diperiksa.
 - Jalankan tes terarah selama implementasi dan satu rangkaian regresi penuh pada kandidat final sebelum menutup milestone. Jika perbaikan mengubah kandidat yang sudah diuji, verifikasi ulang. Untuk tugas dokumentasi non-milestone, gunakan pemeriksaan yang relevan; nyatakan tes yang tidak dijalankan dan alasannya.
 - Ringkas hasil tes yang lulus; sertakan detail yang dibutuhkan untuk menindaklanjuti kegagalan. Hindari refactoring, dependensi, dan perubahan di luar cakupan yang tidak diperlukan.
+
+## Privasi metadata Git
+- Pemilik menerima risiko privasi email author dan committer non-noreply pada commit lama, termasuk jika riwayat kelak tersedia untuk publik. Metadata historis yang disetujui ini saja bukan alasan menahan commit atau push.
+- Jangan rewrite history, rebase, amend commit lama, atau force push untuk mengganti metadata tersebut. Verifikasi author dan committer memakai GitHub noreply sebelum membuat commit baru.
+- Tetap hentikan push dan laporkan tanpa menampilkan nilai sensitif jika ditemukan kredensial, secrets, data keuangan pribadi, atau risiko keamanan baru.
 
 ## Workflow dokumentasi dan Git otomatis
 1. Setelah milestone selesai dan tes lulus, perbarui dokumentasi yang relevan (`README.md` atau `docs/`). Bedakan hasil yang terverifikasi, pekerjaan yang masih berlangsung, dan rencana.
