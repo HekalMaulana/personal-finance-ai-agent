@@ -40,7 +40,7 @@ class FinanceIngress:
         self._platform = platform
         self._dispatch = dispatch
 
-    def receive(self, event):
+    def receive(self, event, *, permit=None):
         raw = getattr(event, 'raw_message', None)
         text = getattr(raw, 'text', None)
         routed_text = getattr(event, 'text', None)
@@ -68,10 +68,12 @@ class FinanceIngress:
                 or type(date) is not datetime or date.utcoffset() is None
                 or type(text) is not str or text != routed_text or not _PREFIX.match(text)):
             return True, None
+        if permit is not None and permit(source) is not True:
+            return True, None
         return True, self._dispatch({'user': uid, 'chat': chat_id, 'message': serial, 'update': update,
                                      'sent_at': date.timestamp(), 'text': text})
 
-    def register(self, ctx, reply):
+    def register(self, ctx, reply, *, permit=None):
         """Trusted operator/harness wiring for Hermes's official pre-dispatch hook.
 
         `reply` is a trusted async transport function (gateway, chat ID, JSON).
@@ -79,11 +81,13 @@ class FinanceIngress:
         """
         async def hook(*, event, gateway, **_):
             try:
-                consumed, result = await asyncio.to_thread(self.receive, event)
+                def check(source):
+                    return permit is None or permit(gateway, source) is True
+                consumed, result = await asyncio.to_thread(self.receive, event, permit=check)
                 if not consumed:
                     return None
                 if result is not None:
-                    await reply(gateway, str(self._owner), json.dumps(result, ensure_ascii=True))
+                    await reply(gateway, str(self._owner), json.dumps(result, ensure_ascii=False))
             except Exception:
                 # Do not let the SDK, socket or error details reach a model or the reply.
                 pass

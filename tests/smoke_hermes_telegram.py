@@ -97,68 +97,113 @@ def probe_with_loop(root, loop):
     assert expected <= {entry['name'] for entry in result['skills']}
     skill = json.loads(skill_view('finance-transactions', preprocess=False))
     assert skill['success'] and '--ledger lesson3-demo summary' in skill['content']
-    probe_finance_hook(root, adapter, dm, loop)
+    # Restore the fixture allowlist for the real adapter command intake test.
+    os.environ['TELEGRAM_ALLOWED_USERS'] = OWNER
+    probe_finance_hook(root, adapter, auth, loop)
 
 
-def probe_finance_hook(root, adapter, dm, loop):
+def probe_finance_hook(root, adapter, auth, loop):
     from datetime import datetime, timezone
     from unittest.mock import patch
-    from gateway.platforms.event import MessageEvent, MessageType
-    from gateway.run_inbound_hooks import GatewayInboundHooksMixin
+    from agent.estop import sentinel_path
+    from gateway.run_inbound import GatewayInboundMixin
     from hermes_cli.plugins import PluginManager
     from hermes_cli.plugins_context import PluginContext
     from hermes_cli.plugins_manifest import PluginManifest
 
     sys.path.insert(0, str(root))
     from finance_storage import TransactionStore
-    from finance_telegram_bridge import FinanceIngress, LedgerRequests
+    from finance_telegram_bridge import LedgerRequests
+    from finance_telegram_gateway import register
 
     path = root / 'bridge-fictional.db'
     ledger = TransactionStore(path)
     service = LedgerRequests(path, int(OWNER))
     manager = PluginManager()
     ctx = PluginContext(PluginManifest(name='finance-offline-fixture'), manager)
-    replies = []
+    replies, events, requests, attempts = [], [], [], []
 
-    async def reply(gateway, chat, text):
-        assert gateway is runner and chat == OWNER
-        replies.append(json.loads(text))
-
-    # The optional Telegram SDK is absent on some offline hosts. Use a typed
-    # fixture for its raw Message; run the actual Hermes hook dispatcher below.
     class RawMessage(SimpleNamespace):
-        pass
+        reply_to_message = None
 
-    ingress = FinanceIngress(int(OWNER), RawMessage, adapter.platform, service.dispatch)
-    ingress.register(ctx, reply)
-    runner = GatewayInboundHooksMixin()
+    class Bot:
+        fail = False
 
-    async def dispatch(text, n, user=OWNER, **raw_fields):
-        source = dm(user)
-        raw = RawMessage(text=text, message_id=n, date=datetime.now(timezone.utc),
-                         from_user=SimpleNamespace(id=int(user), is_bot=False),
-                         chat=SimpleNamespace(id=int(user), type='private'), **raw_fields)
-        event = MessageEvent(text=text, message_type=MessageType.COMMAND, source=source,
-                             raw_message=raw, message_id=str(n), platform_update_id=n)
-        return await runner._hm_pre_gateway_dispatch_hook(event, source)
+        async def send_message(self, *, chat_id, text, parse_mode, disable_web_page_preview, **kwargs):
+            assert chat_id == int(OWNER) and parse_mode is None and disable_web_page_preview is True
+            assert not kwargs, 'Finance replies must not use a thread or alternate route'
+            attempts.append(json.loads(text))
+            if self.fail:
+                raise RuntimeError('simulated transport failure')
+            replies.append(attempts[-1])
+            return SimpleNamespace(message_id=len(replies))
+
+    class Runner(GatewayInboundMixin):
+        adapters = {adapter.platform: adapter}
+        _running = True
+        _draining = _external_drain_active = False
+        _is_user_authorized_for_source = staticmethod(auth._is_user_authorized)
+
+        def _scale_to_zero_note_real_inbound(self):
+            pass  # No idle monitor in this fixture.
+
+    runner = Runner()
+    adapter._bot = Bot()
+
+    def dispatch_request(envelope):
+        requests.append(envelope)
+        return service.dispatch(envelope)
+
+    async def handle(event):
+        events.append(event)
+        assert await runner._hm_admit_event(event) is None, 'finance escaped to agent'
+
+    async def deliver(text, n, user=OWNER, **raw_fields):
+        raw = RawMessage(text=text, message_id=n, date=datetime.now(timezone.utc), entities=(),
+                         from_user=SimpleNamespace(id=int(user), is_bot=False, full_name='Fixture'),
+                         chat=SimpleNamespace(id=int(user), type='private', title=None), **raw_fields)
+        await adapter._handle_command(SimpleNamespace(message=raw, update_id=n + 100), None)
 
     async def exercise():
-        prepare = '/finance prepare ' + json.dumps(dict(transaction_type='expense', amount_rupiah=120,
-            category='Fiktif', occurred_at='2026-01-01T12:00:00+07:00'))
-        assert await dispatch('simulation only', 1) is not None
-        assert await dispatch(prepare, 2, STRANGER) is None
-        assert await dispatch(prepare, 3, forward_origin=object()) is None
-        assert not replies
-        assert await dispatch(prepare, 4) is None
+        prepare = '/finance prepare ' + json.dumps(dict(transaction_type='expense', amount_rupiah=25000,
+            category='Fiktif', description='A_* [`uji`](https://example.invalid)',
+            occurred_at='2026-01-01T12:00:00+07:00'))
+        assert not register(ctx, int(OWNER), dispatch_request, message_class=RawMessage)
+        assert register(ctx, int(OWNER), dispatch_request, enabled=True, message_class=RawMessage)
+        await deliver(prepare, 1, STRANGER)
+        assert not events
+        await deliver(prepare, 2, forward_origin=object())
+        runner._draining = True
+        await deliver(prepare, 3)
+        runner._draining = False
+        pause = sentinel_path()
+        pause.touch()
+        try:
+            await deliver(prepare, 4)
+        finally:
+            pause.unlink()
+        assert not requests and not replies
+        del os.environ['TELEGRAM_ALLOWED_USERS']
+        try:
+            await deliver(prepare, 5)
+            assert not requests and not replies
+        finally:
+            os.environ['TELEGRAM_ALLOWED_USERS'] = OWNER
+        await deliver(prepare, 5)
         preview, = replies
+        assert requests[0]['update'] == 105 and requests[0]['message'] == 5
         assert preview['status'] == 'prepared' and ledger.cash_flow().transaction_count == 0
+        assert preview['parameters']['description'] == 'A_* [`uji`](https://example.invalid)'
         confirm = f"/finance confirm {preview['operation_id']} {preview['preview_digest']}"
-        assert await dispatch(confirm, 5) is None
-        assert replies[-1]['status'] == 'committed' and ledger.cash_flow().total_expense == 120
-        assert await dispatch(confirm, 5) is None
-        assert replies[-1] == {'error': 'replayed_message'}
+        adapter._bot.fail = True
+        await deliver(confirm, 6)
+        assert len(attempts) == 2 and attempts[-1]['status'] == 'committed'
+        assert replies == [preview] and ledger.cash_flow().total_expense == 25000
+        adapter._bot.fail = False
+        await deliver(f"/finance status {preview['operation_id']}", 7)
+        assert replies[-1]['status'] == 'committed' and replies[-1]['transaction_id'] == attempts[1]['transaction_id']
 
-    with patch('hermes_cli.lifecycle.ainvoke_hook', manager.ainvoke_hook):
+    with patch.object(adapter, 'handle_message', handle), patch('hermes_cli.lifecycle.ainvoke_hook', manager.ainvoke_hook):
         loop.run(exercise())
 
 
@@ -219,7 +264,7 @@ def main():
         assert result['ok'] and result['data']['total_expense'] == 120 and result['data']['transaction_count'] == 1
         assert db.read_bytes() == before
         assert not list(sandbox.rglob('*.xlsx'))
-        print('Hermes Telegram smoke: offline access gates, project context/skills and fictional summary OK')
+        print('Hermes Telegram smoke: offline adapter intake, trusted reply routing and Rp25,000 status recovery OK')
 
 
 if __name__ == '__main__':
