@@ -1,4 +1,4 @@
-# Telegram gateway — Lessons 7A–7D
+# Telegram gateway — Lessons 7A–8A
 
 **Fictional data only.** This is an opt-in, single-owner DM setup using [Hermes's built-in Telegram adapter](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/telegram), not a bot framework. The baseline supports skill discovery and simulations without ledger access. Do not run a production bot, install a persistent service, or configure cron delivery from this guide. No gateway launch is needed on a development machine.
 
@@ -124,7 +124,15 @@ Do not add terminal, file, code execution, delegation, browser, messaging, cron,
 
 **On any failed security check:** stop the foreground gateway and ledger service, disable/remove the trusted hook entry point, and remove gateway access to the socket before restarting a baseline-only profile with no ledger. A normal Hermes pause is not a substitute for disconnecting IPC. Check the fictional journal privately if a commit may already have happened; revoke the BotFather token if exposed.
 
-## 4. Verification
+### Lesson 8A: finance-only scope
+
+**Verified offline, not enabled.** The stock Hermes setup above is the Lesson 7 baseline, not a finance-only security boundary. In the v0.23.4 source, `pre_gateway_dispatch` falls through on hook errors, and toolset selection does not replace the adapter's native command/media handlers. Project skill trust controls discovery, not execution privileges. The alternative `FinanceScopeTelegramAdapter` reuses the Hermes transport but registers only one update handler on an empty handler table, skips plugin handlers and the generic agent callback, and matches the original private text from the configured numeric owner against a closed list of commands. It has no model, general tools, ledger or report path. It does not load automatically, and the Lesson 7 bridge remains separate.
+
+The help response to `/finance bantuan` lists the exact syntax for fictional calculations. Example inputs: `/finance arus-kas 5000000 3500000`, `/finance anggaran 1500000 900000`, `/finance dana-darurat 3000000 6`, and `/finance target-tabungan 5000000 1000000 1000000`. Supported requests for transaction recording, ledger summaries and Excel are recognized but referred to the local CLI; arbitrary phrasing is not supported. Non-finance and mixed requests receive a refusal without being echoed. There is no live launcher in this lesson. Keep Telegram financial reads, writes and exports disabled until separately approved Bot API acceptance and deployment security checks pass.
+
+With the existing Hermes Python environment and a local checkout or source archive of the upstream `v0.23.4` tag, run `python -B tests/smoke_hermes_telegram_scope.py --hermes-source PATH_TO_HERMES_0_23_4` from this project. The probe verifies the imported adapter path, exercises handler registration and dispatch with SDK stand-ins, and rejects selected network, subprocess and SQLite events via a Python audit hook. It does not start the gateway or prove OS containment, live Bot API delivery, or service behavior. The Windows project regression discovered 111 unit tests (110 passed, 1 POSIX-only cron test skipped).
+
+## 4. Verification (Lessons 7A–7D)
 
 **Offline smoke, no token/SDK/LLM:** run `tests/smoke_hermes_telegram.py` with the Python interpreter from the installed Hermes runtime (not the finance venv). Use the actual executable path for that installation; on a venv-based install it is under `Scripts\python.exe` or `bin/python` in the Hermes venv. On PM-managed Windows installs the active runtime can be under `hermes\installs\…\environments\…\venv`, not the source tree. Keep Python optimization off.
 

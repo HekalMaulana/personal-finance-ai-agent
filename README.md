@@ -128,6 +128,8 @@ VPS deployment is documented as a proposal and remains **unverified**: no step h
 
 **Lesson 7D — offline E2E readiness.** The installed Hermes Telegram adapter and trusted hook handle simulated owner commands and send exact previews/results to a recording bot transport. The Ubuntu WSL fixture exercises the hook-to-ledger path across Linux UIDs with one fictional Rp25,000 commit. See the [preflight and phased acceptance guide](docs/deployment/telegram.md#lesson-7d-offline-e2e-readiness). No bot token or model is needed for these checks. The bridge is not auto-loaded; live Bot API and effective deployed-agent isolation remain pending. Keep Telegram ledger reads and writes disabled.
 
+**Lesson 8A — finance-only scope, offline verified.** An alternative owner-DM adapter recognizes complete finance commands and runs four fictional calculations without dispatching a model or tools. It refuses unrelated or mixed instructions and directs ledger or Excel requests to the local CLI. It is not installed or enabled by the stock gateway. See the [v0.23.4 source smoke and remaining blockers](docs/deployment/telegram.md#lesson-8a-finance-only-scope).
+
 ## Testing
 
 From the clone with the reporting dependency installed:
