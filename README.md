@@ -65,6 +65,7 @@ See the [Linux guide](docs/deployment/linux.md) for system packages and Hermes s
 1. Install the [Hermes CLI](https://hermes-agent.nousresearch.com/docs/getting-started/installation). Run `hermes setup model` and `hermes doctor`. Use your own provider and the local terminal backend on the host where the clone and `.venv` live.
 2. From the Git root, review `AGENTS.md` and [`.hermes/skills/`](.hermes/skills/). Run `hermes skills trust` for this checkout and launch `hermes` from the same directory. You don't need to install global finance skills. See [Hermes project-local skills](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills#project-local-skills).
 3. In a new conversation, ask Hermes to list the project skills and load `personal-finance-analysis`. If discovery is unavailable, ask it to read the relevant reviewed `SKILL.md` from this checkout. That fallback does not prove automatic discovery.
+4. Create a private Hermes profile per installation: point `HERMES_HOME` at a dedicated directory outside the clone and do not reuse a shared, developer, desktop, or cloud-synced profile. The deployment guides ([Windows](docs/deployment/windows.md), [Linux](docs/deployment/linux.md), [VPS](docs/deployment/vps.md), [Telegram](docs/deployment/telegram.md)) show the exact per-OS commands and permission checks.
 
 For an API-key provider, use its documented environment variable or the private Hermes environment file (`hermes config env-path` locates it). For OAuth, use Hermes's sign-in flow. The finance CLI requires no environment variables and does not load a project `.env`.
 
@@ -115,11 +116,11 @@ The [cron deployment guide](docs/deployment/cron.md) covers dry-run, installatio
 
 ## VPS Deployment Overview
 
-The [VPS guide](docs/deployment/vps.md) includes the fresh-clone checklist, optional Hermes-managed systemd gateway, and SQLite recovery. Service startup after reboot and 2 GB RAM capacity have not been verified on a real VPS.
+VPS deployment is documented as a proposal and remains **unverified**: no step has been run on a real VPS. Service startup after reboot and 2 GB RAM capacity have not been validated. The [VPS guide](docs/deployment/vps.md) covers the fresh-clone checklist, optional Hermes-managed systemd gateway, and SQLite recovery.
 
 ## Telegram Integration
 
-**Lesson 7A — offline-verified setup for fictional data.** The [Telegram deployment guide](docs/deployment/telegram.md) uses Hermes's built-in gateway with a dedicated profile and owner-only DMs. The baseline can discover project skills and discuss fictional scenarios; the Telegram toolset does not include the terminal needed to invoke the finance CLI. Use the local CLI for ledger operations. The disposable smoke test needs no bot token, network, model call, gateway process, or persistent service. Live Telegram delivery and production isolation are not verified.
+**Disabled.** Telegram financial access is disabled and must stay disabled until live transport and deployed-agent isolation are verified. The setup documented below is offline-verified on fictional data only. The [Telegram deployment guide](docs/deployment/telegram.md) uses Hermes's built-in gateway with a dedicated profile and owner-only DMs. The baseline can discover project skills and discuss fictional scenarios; the Telegram toolset does not include the terminal needed to invoke the finance CLI. Use the local CLI for ledger operations. The disposable smoke test needs no bot token, network, model call, gateway process, or persistent service. Live Telegram delivery and production isolation are not verified.
 
 **Lesson 7B — bound confirmation, offline only.** `finance_telegram.py` validates and previews fictional income or expenses, then binds confirmation to the same owner/private chat, operation ID and preview digest. The SQLite journal expires pending actions after five minutes and commits the ledger entry and audit state together. Test it with `-p test_telegram_actions.py` added to the commands below. [See the offline example and security audit](docs/deployment/telegram.md#lesson-7b-offline-bound-confirmation). Hermes has sender metadata inside the gateway, but the skill-to-shell path is not an authorization boundary. Telegram ledger reads, writes, corrections, and Excel delivery remain disabled.
 

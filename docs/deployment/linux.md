@@ -11,7 +11,7 @@ Target: Ubuntu 24.04 LTS. The CLI and Excel workflows were tested under Ubuntu 2
    ```
 
    Use Python 3.12 or later. On another distribution, use its package manager and check the installed Python version before continuing.
-2. Clone into a user-owned directory on the Linux filesystem. On WSL, prefer your Linux home over a Windows-mounted drive.
+2. Clone into a user-owned directory on the Linux filesystem. On WSL, prefer your Linux home over a Windows-mounted drive. Set `umask 077` in the shell before creating the clone and any state directories (or restrict the clone, ledgers, reports, and Hermes profile to your user with ACLs) so SQLite ledgers, sidecars, and profile state are not readable by other local users.
 
    ```bash
    git clone https://github.com/HekalMaulana/personal-finance-ai-agent.git
@@ -22,7 +22,7 @@ Target: Ubuntu 24.04 LTS. The CLI and Excel workflows were tested under Ubuntu 2
    ```
 
    If venv creation reports that `ensurepip` is missing, install the matching Python venv package. Do not install packages into the system interpreter to work around it.
-3. Install the Linux CLI using the [official Hermes installation guide](https://hermes-agent.nousresearch.com/docs/getting-started/installation#without-hermes-desktop). Open a fresh shell, return to the clone, then run `hermes --version`, `hermes setup model`, and `hermes doctor`. Choose your own provider and tool-capable model. If Hermes is not on PATH, check the launcher path in the installation guide.
+3. Install the Linux CLI using the [official Hermes installation guide](https://hermes-agent.nousresearch.com/docs/getting-started/installation#without-hermes-desktop). Open a fresh shell, return to the clone, then run `hermes --version`, `hermes setup model`, and `hermes doctor`. Choose your own provider and tool-capable model. If Hermes is not on PATH, check the launcher path in the installation guide. Use a private Hermes profile for this installation only: set `HERMES_HOME` to a dedicated directory outside the clone (for example `$HOME/.hermes-finance`), never a shared, developer, or cloud-synced profile.
 4. Follow [running Hermes](../../README.md#running-hermes-agent) to review the skills, trust the checkout, and chat. Use the local terminal backend with the repository on the same host. The skills call `./.venv/bin/python`; no activation is required.
 
 ## Optional scheduled analysis
